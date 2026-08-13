@@ -3,6 +3,18 @@
 DART 문서는 주석 세트를 여러 벌 담을 수 있다. 사업보고서는 연결·별도
 2벌이고 같은 내용이 서로 다른 번호를 쓴다(연결 16번 = 별도 15번). 그래서
 참조가 놓인 위치가 어느 세트 안인지 보고 번호를 풀어야 한다.
+
+DART는 재무제표에 주석 번호를 두 가지 모양으로 단다.
+  ① 인라인 — 계정명 텍스트 안에 '주석'이라는 글자와 함께 번호가 붙는다.
+     '현금및현금성자산(주석3,4)'. 비상장 외감법인 K-GAAP 재무제표에 흔하다.
+     _REF가 이 모양을 담당한다.
+  ② 전용 열 — 표 헤더에 '주석'이라는 열이 따로 있고, 그 열의 각 칸에
+     '주석'이라는 글자 없이 번호만 홀로 들어간다('4, 28'·'27'). 상장사
+     IFRS 재무제표(삼성전자 등)의 표준 모양이다. _collect_column_ref_edits가
+     이 모양을 담당한다 — 헤더 행에서 '주석'(공백 허용) 칸을 찾아 그
+     앞 칸들의 colspan을 더해 열 번호를 구하고, 본문 각 행에서 같은 방식
+     으로 그 열을 짚어 번호를 뽑는다. 두 모양 모두 번호를 찾은 뒤엔 같은
+     _resolve_set으로 연결·별도를 가른다.
 """
 import re
 
@@ -51,6 +63,16 @@ _BLOCK = re.compile(r"<(h([1-5])|p)\b([^>]*)>(.*?)</\1>", re.S)
 _TAG = re.compile(r"<[^>]*>")
 _TABLE = re.compile(r"<table\b.*?</table>", re.S)
 _ID_ATTR = re.compile(r'\bid="([^"]*)"')
+
+# 전용 '주석' 열(모양 ②) 파싱에 쓰는 태그 조각들.
+_TABLE_TAG = re.compile(r"<table\b[^>]*>|</table>")
+_THEAD = re.compile(r"<thead>(.*?)</thead>", re.S)
+_TR = re.compile(r"<tr>(.*?)</tr>", re.S)
+# th/td 짝만 맞춘다 — <th>로 열었으면 </th>로만, <td>는 </td>로만 닫힌다고
+# 본다(\1 역참조). DART 변환기는 늘 짝을 맞춰 내므로 안전하다.
+_CELL = re.compile(r"<t([hd])\b([^>]*)>(.*?)</t\1>", re.S)
+_COLSPAN_ATTR = re.compile(r'colspan="(\d+)"')
+_WS = re.compile(r"\s+")
 
 NREF_CLASS = "nref"
 
@@ -251,6 +273,12 @@ def _resolve_set(sets, marks, pos, before_text):
         '재무제표 주석'=별도) 참조 왼쪽에 가장 가까운 단서를 택하는
         방식으로 바꿀 것. 단순히 '마지막 연결 vs 마지막 별도'로는 안
         된다 — 별도 단서가 아예 없는 STX 문장이 다시 깨진다.
+      - 전용 '주석' 열(모양 ②) 칸에는 번호만 있고 앞뒤로 문장이 없다.
+        그래서 이 칸에서 온 참조는 before_text가 사실상 항상 비어 있고,
+        늘 위 문단·쉼표 절 단서가 아니라 직전 제목 휴리스틱만으로
+        연결·별도를 가른다 — 표가 '2-1. 연결 재무상태표'처럼 소속을
+        밝히는 제목 바로 아래 있어야 정확하다는 뜻이다. 실 공시에서는
+        재무제표 표가 늘 그런 제목 아래 있어 지금까지 문제가 없었다.
     """
     for s in sets:
         if s.contains(pos):
@@ -287,9 +315,9 @@ def _text_segments(html):
     return segs
 
 
-def _collect_ref_edits(html, sets):
+def _collect_ref_edits(html, sets, marks):
+    """모양 ① — '주석' 글자가 붙은 인라인 참조를 링크한다."""
     edits = []
-    marks = _heading_marks(html)
     for seg_start, seg_end in _text_segments(html):
         seg = html[seg_start:seg_end]
         for m in _REF.finditer(seg):
@@ -304,6 +332,132 @@ def _collect_ref_edits(html, sets):
                 edits.append((nums_start + nm.start(), nums_start + nm.end(),
                               f'<a class="{NREF_CLASS}" href="#{anchor}">'
                               f'{nm.group()}</a>'))
+    return edits
+
+
+def _colspan(attrs):
+    m = _COLSPAN_ATTR.search(attrs)
+    return int(m.group(1)) if m else 1
+
+
+def _cell_text_matches_note(inner_html):
+    return _WS.sub("", _text_of(inner_html)) == "주석"
+
+
+def _table_elements(html):
+    """문서 안 모든 <table>…</table> 요소의 (시작, 끝)을 돌려준다. 중첩된
+    테이블도 각각 독립된 요소로 담긴다 — 바깥 테이블을 볼 때는
+    _mask_nested_tables로 그 안쪽을 지워 직계 자식 행만 보고, 중첩 테이블은
+    이 목록의 별도 항목으로서 자기 자신의 프레임 안에서 다시 처리된다."""
+    stack = []
+    tables = []
+    for m in _TABLE_TAG.finditer(html):
+        if m.group(0).startswith("</"):
+            if stack:
+                tables.append((stack.pop(), m.end()))
+        else:
+            stack.append(m.start())
+    return tables
+
+
+def _mask_nested_tables(segment):
+    """segment(<table>…</table> 전체) 안에 중첩된 테이블이 있으면 그 내용을
+    같은 길이의 공백으로 지운 사본을 돌려준다 — 오프셋은 그대로 유지하면서
+    바깥 테이블의 직계 자식 행·칸만 정규식으로 안전하게 훑기 위해서다."""
+    out = list(segment)
+    depth = 0
+    nest_start = None
+    for m in _TABLE_TAG.finditer(segment):
+        if m.group(0).startswith("</"):
+            depth -= 1
+            if depth == 1 and nest_start is not None:
+                for i in range(nest_start, m.end()):
+                    if out[i] != "\n":
+                        out[i] = " "
+                nest_start = None
+        else:
+            depth += 1
+            if depth == 2:
+                nest_start = m.start()
+    return "".join(out)
+
+
+def _note_column_index(masked_table_html):
+    """헤더 행에서 '주석'(공백 허용) 칸을 찾아 (열 인덱스, 그 행의 전체
+    열 수)를 돌려준다. <thead>가 없거나 '주석' 칸이 없으면 None — thead
+    없는 표는 아예 다루지 않는다(실 공시 26건 중 그런 사례가 없었다).
+    """
+    thead_m = _THEAD.search(masked_table_html)
+    if not thead_m:
+        return None
+    for tr_m in _TR.finditer(thead_m.group(1)):
+        col = 0
+        note_col = None
+        for cell_m in _CELL.finditer(tr_m.group(1)):
+            cs = _colspan(cell_m.group(2))
+            if note_col is None and _cell_text_matches_note(cell_m.group(3)):
+                note_col = col
+            col += cs
+        if note_col is not None:
+            return note_col, col
+    return None
+
+
+def _collect_column_ref_edits(html, sets, marks, inline_spans):
+    """모양 ② — 전용 '주석' 열의 칸에 홀로 든 번호를 링크한다.
+
+    칸 하나에 번호가 여럿이면('4, 28') 인라인 경로와 똑같이 하나씩 각자
+    링크한다. 빈 칸·숫자가 아닌 칸·항목이 없는 번호는 손대지 않는다(뒤
+    _resolve_set.items.get이 항목 없는 번호를 그냥 걸러 준다).
+
+    행 정렬 안전장치: 앞 칸의 rowspan이 뒤 행의 칸을 밀 수 있다. 이 행
+    자신의 <td>들이 낸 colspan 합이 헤더의 전체 열 수와 안 맞으면, 그
+    칸이 실제로 몇 번째 열인지 추측하지 않고 행 전체를 건너뛴다 — 잘못
+    링크하느니 안 거는 쪽이 낫다.
+
+    표 칸에는 '주석'이라는 글자가 없으므로 인라인 경로(_REF)와 겹칠 일이
+    실제로는 없지만, inline_spans로 이미 링크된 자리를 한 번 더 걸러
+    이중 링크를 막는다.
+    """
+    edits = []
+    for start, end in _table_elements(html):
+        seg = html[start:end]
+        masked = _mask_nested_tables(seg)
+        info = _note_column_index(masked)
+        if info is None:
+            continue
+        note_col, header_total = info
+        thead_end = _THEAD.search(masked).end()
+        for tr_m in _TR.finditer(masked, thead_end):
+            row = tr_m.group(1)
+            col = 0
+            note_span = None
+            for cell_m in _CELL.finditer(row):
+                cs = _colspan(cell_m.group(2))
+                if col <= note_col < col + cs:
+                    note_span = (tr_m.start(1) + cell_m.start(3),
+                                 tr_m.start(1) + cell_m.end(3))
+                col += cs
+            if col != header_total or note_span is None:
+                continue          # 정렬이 안 맞는 행 — 짐작하지 않고 건너뛴다
+            abs_start = start + note_span[0]
+            abs_end = start + note_span[1]
+            cell_html = html[abs_start:abs_end]
+            for seg_start, seg_end in _text_segments(cell_html):
+                text_seg = cell_html[seg_start:seg_end]
+                for nm in _REF_NUM.finditer(text_seg):
+                    num_start = abs_start + seg_start + nm.start()
+                    num_end = abs_start + seg_start + nm.end()
+                    if _in_spans(num_start, inline_spans):
+                        continue
+                    before = _clause_before(text_seg[:nm.start()])
+                    note_set = _resolve_set(sets, marks, num_start, before)
+                    anchor = note_set.items.get(int(nm.group()))
+                    if not anchor:
+                        continue
+                    edits.append((num_start, num_end,
+                                  f'<a class="{NREF_CLASS}" href="#{anchor}">'
+                                  f'{nm.group()}</a>'))
     return edits
 
 
@@ -351,5 +505,9 @@ def add_note_links(body_html):
     if not any(s.items for s in sets):
         return body_html
 
-    edits.extend(_collect_ref_edits(body_html, sets))
+    marks = _heading_marks(body_html)
+    ref_edits = _collect_ref_edits(body_html, sets, marks)
+    edits.extend(ref_edits)
+    inline_spans = [(s, e) for s, e, _ in ref_edits]
+    edits.extend(_collect_column_ref_edits(body_html, sets, marks, inline_spans))
     return _apply(body_html, edits)

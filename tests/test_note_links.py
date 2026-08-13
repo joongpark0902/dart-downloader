@@ -380,6 +380,71 @@ class SharedOffsetAnchorTest(unittest.TestCase):
         self.assertEqual([], broken, f"깨진 앵커: {broken}")
 
 
+class NoteColumnTest(unittest.TestCase):
+    """전용 '주석' 열(모양 ②) — 삼성전자 감사보고서에서 실제로 확인한
+    구조를 재현한다. 헤더가 '과목·주석·기간(colspan2)·기간(colspan2)'인
+    표에서, 계정명이 아니라 '주석' 열의 칸에 번호만 홀로 든다.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = note_links.add_note_links(_body("note_column"))
+
+    def _row(self, account):
+        m = re.search(r"<tr><td[^>]*>%s</td>(.*?)</tr>" % re.escape(account),
+                      self.html)
+        self.assertIsNotNone(m, f"'{account}' 행을 찾지 못했다")
+        return m.group(1)
+
+    def test_single_number_cell_linked(self):
+        """'27' 하나뿐인 칸은 그 번호 하나만 링크된다."""
+        row = self._row("2. 매출채권")
+        self.assertEqual([("sec7", "27")], LINK.findall(row))
+
+    def test_multiple_numbers_in_one_cell_each_linked_separately(self):
+        """'4, 28'은 두 번호가 각각 따로 링크된다."""
+        row = self._row("1. 현금및현금성자산")
+        self.assertEqual([("sec4", "4"), ("sec8", "28")], LINK.findall(row))
+
+    def test_blank_cell_untouched(self):
+        """주석 칸이 빈 행은 손대지 않는다."""
+        row = self._row("3. 재고자산")
+        self.assertEqual([], LINK.findall(row))
+        self.assertNotIn('<a class="nref"', row)
+
+    def test_number_without_matching_note_left_alone(self):
+        """항목이 없는 번호(99)는 원문 그대로 남아야 한다."""
+        row = self._row("4. 없는주석계정")
+        self.assertEqual([], LINK.findall(row))
+        self.assertIn("<td>99</td>", row)
+
+    def test_row_after_rowspan_shift_is_skipped_not_guessed(self):
+        """앞 행의 rowspan이 이 행의 칸을 한 칸씩 밀었다 — 이 행 자신의
+        colspan 합이 헤더 전체 열 수(6)와 안 맞으므로, 항목 8이 실제로
+        있어도(sec6) 링크하지 않고 건너뛴다."""
+        row = self._row("8")
+        self.assertEqual([], LINK.findall(row))
+        self.assertTrue(row.startswith("<td>20</td>"))
+
+    def test_aligned_row_before_the_rowspan_still_links(self):
+        """rowspan을 낸 행 자신은 여전히 정렬이 맞으므로 정상 링크된다."""
+        row = self._row("동일계정그룹")
+        self.assertEqual([("sec5", "7")], LINK.findall(row))
+
+    def test_header_row_itself_not_linked(self):
+        """헤더의 '주석' 칸과 기간 칸('제 10(당) 기'의 숫자 등)은 링크되면
+        안 된다."""
+        m = re.search(r"<thead>.*?</thead>", self.html, re.S)
+        self.assertIsNotNone(m)
+        self.assertNotIn('class="nref"', m.group(0))
+
+    def test_every_link_target_exists(self):
+        ids = _reachable_ids(self.html)
+        links = LINK.findall(self.html)
+        broken = [t for t, _ in links if t not in ids]
+        self.assertEqual([], broken, f"깨진 앵커: {broken}")
+
+
 class ConvertIntegrationTest(unittest.TestCase):
     """convert_to_html이 만든 최종 파일에 주석 링크가 들어 있어야 한다."""
 
