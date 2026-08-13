@@ -225,11 +225,20 @@ def _resolve_set(sets, marks, pos, before_text):
         '주석' vs '주석' 같은 경우) 세트 밖 참조는 전부 sets[0]로
         간다 — 근거 없이 첫 세트를 고르는 것과 같다.
       - before_text는 참조와 같은 텍스트 세그먼트(태그로 안 끊긴 같은
-        구간 — 보통 같은 문장·같은 칸) 안에서 참조보다 앞쪽만 본다.
-        그래서 이전 제목이나 옆 칸의 '연결'은 더 이상 단서로 새지
-        않는다. 다만 같은 문장이라도 참조 앞에 인라인 태그(<b>·<br>
-        등)가 끼어 있으면 그 앞은 별도 세그먼트라 못 본다 — 그런
-        자리는 직전 제목 휴리스틱으로 넘어간다.
+        구간 — 보통 같은 문장·같은 칸) 안에서, 그 세그먼트 안 마지막
+        쉼표(,) 뒤 — 즉 참조가 속한 절(clause)만 본다. 세그먼트 안에
+        쉼표가 없으면 세그먼트 전체를 본다. 그래서 이전 제목이나 옆
+        칸의 '연결'은 물론, 같은 문장 안 앞선 절의 '연결'도 더 이상
+        단서로 새지 않는다 — "…3. 연결재무제표 주석 > "주석 25",
+        …5. 재무제표 주석 > "주석 23" 등을 참조" 처럼 한 문장이 연결·
+        별도 두 세트를 다 인용하는 특수관계자 주석 안내문에서 흔하다.
+        쉼표로만 자르고 세미콜론으로는 안 자른다 — &gt;·&quot; 같은
+        HTML 개체가 세미콜론으로 끝난 채 텍스트 세그먼트에 그대로
+        남아 있어서, 세미콜론까지 자르면 개체 경계를 절 경계로 오인해
+        옆 참조(주석 25)를 오히려 엉뚱한 세트로 튕겨 낸다. 다만 같은
+        문장이라도 참조 앞에 인라인 태그(<b>·<br> 등)가 끼어 있으면 그
+        앞은 별도 세그먼트라 못 본다 — 그런 자리는 직전 제목
+        휴리스틱으로 넘어간다.
     """
     for s in sets:
         if s.contains(pos):
@@ -239,6 +248,18 @@ def _resolve_set(sets, marks, pos, before_text):
         if s.is_consolidated == want_con:
             return s
     return sets[0]
+
+
+def _clause_before(before):
+    """before 텍스트를 참조가 속한 절로 좁힌다 — 세그먼트 안 마지막
+    쉼표(,) 뒤만 남긴다. 쉼표가 없으면 세그먼트 전체를 그대로 둔다.
+
+    쉼표로만 자른다. 세미콜론으로 자르지 않는 이유는 _resolve_set
+    독스트링에 있다 — &gt;·&quot; 같은 HTML 개체가 세미콜론으로 끝난
+    채 텍스트 세그먼트에 남아 있어서다.
+    """
+    idx = before.rfind(",")
+    return before[idx + 1:] if idx != -1 else before
 
 
 def _text_segments(html):
@@ -261,7 +282,7 @@ def _collect_ref_edits(html, sets):
         seg = html[seg_start:seg_end]
         for m in _REF.finditer(seg):
             abs_start = seg_start + m.start()
-            before = seg[:m.start()]
+            before = _clause_before(seg[:m.start()])
             note_set = _resolve_set(sets, marks, abs_start, before)
             nums_start = seg_start + m.start(1)
             for nm in _REF_NUM.finditer(m.group(1)):

@@ -297,6 +297,42 @@ class BeforeTextRawHtmlLeakTest(unittest.TestCase):
         self.assertEqual([("n2b", "2")], LINK.findall(m.group(1)))
 
 
+class ClauseScopedEvidenceTest(unittest.TestCase):
+    """분기보고서 특수관계자 주석 안내문처럼 한 문장(=한 텍스트 세그먼트)
+    안에서 연결·별도 두 세트를 순서대로 인용하는 경우.
+
+    앞 절의 '3. 연결재무제표 주석 > "주석 25"'에 남은 '연결'이 뒤 절의
+    '5. 재무제표 주석 > "주석 23"'까지 오염시키면 안 된다 — before_text가
+    세그먼트 전체면(수정 전) 오염되고, 참조가 속한 절(마지막 쉼표 뒤)로
+    좁히면(수정 후) 오염되지 않는다. STX 분기보고서_2026에서 실제로
+    확인한 문구 구조를 그대로 옮겼다.
+    """
+
+    HTML = (
+        '<h3>3. 연결재무제표 주석</h3>'
+        '<h3 id="c23">23. 법인세 (연결)</h3><p>내용.</p>'
+        '<h3 id="c25">25. 특수관계자 (연결)</h3><p>내용.</p>'
+        '<h3>5. 재무제표 주석</h3>'
+        '<h3 id="s23">23. 특수관계자</h3><p>내용.</p>'
+        '<h2>Ⅲ. 재무에관한사항</h2>'
+        '<p>기타 특수관계자와의 거래 등은 Ⅲ. 재무에관한사항 &gt; 3. 연결재무제표 주석 &gt;'
+        ' &quot;주석 25. 특수관계자&quot;, Ⅲ. 재무에관한사항 &gt;5. 재무제표 주석 &gt;'
+        ' &quot;주석 23. 특수관계자&quot; 등을 참조하시기 바랍니다.</p>'
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = note_links.add_note_links(cls.HTML)
+
+    def test_second_reference_resolves_to_separate_set(self):
+        m = re.search(r"등을 참조하시기 바랍니다", self.html)
+        self.assertIsNotNone(m)
+        para = self.html[max(0, m.start() - 400):m.start()]
+        links = LINK.findall(para)
+        self.assertEqual([("c25", "25"), ("s23", "23")], links,
+                          "뒤 절의 주석23이 앞 절의 '연결'에 오염돼 c23으로 새면 안 된다")
+
+
 class ConvertIntegrationTest(unittest.TestCase):
     """convert_to_html이 만든 최종 파일에 주석 링크가 들어 있어야 한다."""
 
