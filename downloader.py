@@ -4,6 +4,7 @@ import zipfile
 
 import requests
 
+from xml_fix import _DART_BR_ENTITY
 
 # ── 내부 상수 ────────────────────────────────────────────────────────────────
 _DOC_URL = "https://opendart.fss.or.kr/api/document.xml"
