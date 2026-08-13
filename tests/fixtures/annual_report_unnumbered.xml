@@ -1,0 +1,37 @@
+<DOCUMENT>
+<DOCUMENT-NAME>사업보고서</DOCUMENT-NAME>
+<COMPANY-NAME>테스트주식회사</COMPANY-NAME>
+<COVER><COVER-TITLE>사 업 보 고 서</COVER-TITLE></COVER>
+<BODY>
+<SECTION-1><TITLE>III. 재무에 관한 사항</TITLE>
+<SECTION-2><TITLE>2-1. 연결 재무상태표</TITLE>
+<TABLE-GROUP><TABLE><TBODY>
+<TR><TD>재고자산(주석3,4)</TD><TD>1,000</TD></TR>
+<TR><TD>매출채권(주석 8 참조)</TD><TD>2,000</TD></TR>
+</TBODY></TABLE></TABLE-GROUP>
+</SECTION-2>
+<SECTION-2><TITLE>3. 연결재무제표 주석</TITLE></SECTION-2>
+<SECTION-2><TITLE>1. 지배기업의 개요 (연결)</TITLE><P>지배기업의 개요입니다.</P></SECTION-2>
+<SECTION-2><TITLE>2. 중요한 회계처리방침 (연결)</TITLE><P>주석 4, 5에서 설명하고 있습니다.</P></SECTION-2>
+<SECTION-2><TITLE>3. 중요한 회계정책 (연결)</TITLE><P>회계정책입니다.</P></SECTION-2>
+<SECTION-2><TITLE>4. 종속기업의 현황 5. 관계기업및공동기업투자주식 (연결)</TITLE><P>합쳐진 제목입니다.</P></SECTION-2>
+<SECTION-2><TITLE>6. 영업부문 (연결)</TITLE><P>영업부문입니다.</P></SECTION-2>
+<SECTION-2><TITLE>7-1. 범주별 금융상품 (연결)</TITLE><P>범주별 금융상품입니다.</P></SECTION-2>
+<SECTION-2><TITLE>8. 매출채권 및 기타채권 (연결)</TITLE><P>매출채권입니다.</P></SECTION-2>
+<SECTION-2><TITLE>16. 사채, 차입금 (연결)</TITLE><P>(1) 차입금 내역<SPAN USERMARK="B">굵게</SPAN></P></SECTION-2>
+<SECTION-2><TITLE>17. 충당부채 (연결)</TITLE><P>추정의 주요 가정- 주석 17 및 28: 충당부채와 우발부채</P></SECTION-2>
+<SECTION-2><TITLE>28. 우발부채 및 약정사항 (연결)</TITLE><P>재무제표 주석의 2. 재무제표 작성기준을 참고하십시오.</P></SECTION-2>
+<SECTION-2><TITLE>재 무 제 표</TITLE>
+<TABLE-GROUP><TABLE><TBODY>
+<TR><TD>재고자산(주석3,4)</TD><TD>900</TD></TR>
+</TBODY></TABLE></TABLE-GROUP>
+</SECTION-2>
+<SECTION-2><TITLE>5. 재무제표 주석</TITLE></SECTION-2>
+<SECTION-2><TITLE>1. 회사의 개요</TITLE><P>회사의 개요입니다.</P></SECTION-2>
+<SECTION-2><TITLE>2. 중요한 회계처리방침</TITLE><P>(11) 자산손상은 별도 항목이 아닙니다.</P></SECTION-2>
+<SECTION-2><TITLE>3. 중요한 회계정책</TITLE><P>1) 리스제공자도 항목이 아닙니다.</P></SECTION-2>
+<SECTION-2><TITLE>15. 사채, 차입금</TITLE><P>분류되어 있습니다(주석 15 참조).</P></SECTION-2>
+<SECTION-2><TITLE>99. 없는번호참조</TITLE><P>없는 번호입니다(주석 77 참조).</P></SECTION-2>
+</SECTION-1>
+</BODY>
+</DOCUMENT>
