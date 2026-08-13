@@ -225,6 +225,47 @@ class TitleNumberMissingPeriodTest(unittest.TestCase):
         self.assertIn('<a class="nref" href="#n8">8</a>', self.html)
 
 
+class DigitLedSeparatorTest(unittest.TestCase):
+    """숫자로 시작하지만 번호 항목이 아닌 구분 제목('6 대 매 출 처 현황'처럼
+    letter-spacing된 제목)도 세트를 닫아야 한다.
+
+    _TITLE_NO_LIKE가 '\\b'만 보던 시절엔 이런 제목도 번호 항목처럼 보여
+    세트를 안 닫았고, 그 뒤에 나오는 '주석 2' 같은 참조가 (전혀 다른
+    맥락인데도) 앞 세트에 남아 있던 항목으로 잘못 링크됐다. 세트가
+    둘이라 별도 세트 쪽에 같은 번호 항목이 없으므로, 고쳐진 뒤엔
+    아예 링크되지 않아야 한다.
+    """
+
+    HTML = (
+        '<h3>3. 연결재무제표 주석</h3>'
+        '<h3 id="n2">2. 회계정책 (연결)</h3><p>내용.</p>'
+        '<h3>6 대 매 출 처 현 황</h3>'
+        '<p>최근 5개년 동안의 매출 상위 거래처 현황은 다음 표와 같으며'
+        ' 재무제표 주석과는 무관한 별도 안내 사항입니다.</p>'
+        '<p>주석 2 참고 바랍니다.</p>'
+        '<h3>5. 재무제표 주석</h3>'
+        '<h3 id="n2b">2. 회계정책</h3><p>내용.</p>'
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = note_links.add_note_links(cls.HTML)
+
+    def test_reference_after_separator_does_not_leak_into_preceding_set(self):
+        """구분 제목 뒤의 '주석 2'는 앞(연결) 세트의 n2가 아니라 뒤(별도)
+        세트의 n2b로 가야 한다.
+
+        '재 무 제 표'처럼 앞 헤딩 텍스트엔 '연결' 단서가 없지만, 그
+        헤딩보다 앞선 60자 원본 HTML 안에는 '(연결)'이 남아 있을 수
+        있어 필러 문단으로 거리를 벌렸다(그 경우까지 걸리면 이 테스트가
+        아니라 _resolve_set의 알려진 60자 한계를 건드리는 것이라 별개
+        문제다).
+        """
+        m = re.search(r"주석(.*?)참고 바랍니다\.", self.html)
+        self.assertIsNotNone(m)
+        self.assertEqual([("n2b", "2")], LINK.findall(m.group(1)))
+
+
 class ConvertIntegrationTest(unittest.TestCase):
     """convert_to_html이 만든 최종 파일에 주석 링크가 들어 있어야 한다."""
 
