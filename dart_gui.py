@@ -8,6 +8,8 @@ from tkinter import filedialog
 
 import customtkinter as ctk
 
+import settings
+import ui_theme
 from dart_engine import (
     calculate_financial_ratios,
     convert_to_html,
@@ -25,83 +27,14 @@ from dart_engine import (
     load_corp_list,
     search_company,
 )
-
-# exe로 묶으면 __file__ 은 임시 해제 폴더(_MEIxxxx)를 가리키므로
-# 저장 폴더·CORPCODE 캐시는 실행파일이 놓인 폴더 기준으로 잡는다.
-if getattr(sys, "frozen", False):
-    _APP_DIR = os.path.dirname(sys.executable)
-else:
-    _APP_DIR = os.path.dirname(os.path.abspath(__file__))
-
-ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("blue")
-_DEFAULT_DOWNLOADS = os.path.join(_APP_DIR, "downloads")
-_CORPCODE_PATH     = os.path.join(_APP_DIR, "CORPCODE.xml")
-_CONFIG_PATH       = os.path.join(_APP_DIR, "config.txt")
-
-_CONFIG_HEADER = (
-    "# DART OpenAPI 인증키 (https://opendart.fss.or.kr 에서 발급)\n"
-    "# 이 파일에는 본인 인증키가 들어 있습니다. 공유하거나 git에 올리지 마세요.\n"
-)
-
-
-def load_api_key():
-    """config.txt에서 인증키를 읽는다. 없으면 빈 문자열."""
-    try:
-        with open(_CONFIG_PATH, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith("#") or "=" not in line:
-                    continue
-                name, _, value = line.partition("=")
-                if name.strip().lower() == "api_key":
-                    return value.strip()
-    except OSError:
-        pass
-    return ""
-
-
-def save_api_key(key):
-    """인증키를 실행파일 옆 config.txt에 저장한다."""
-    with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
-        f.write(f"{_CONFIG_HEADER}api_key = {key}\n")
-    return _CONFIG_PATH
+from settings import load_api_key, save_api_key
+from ui_theme import fmt_div_val, fmt_ratio_val, fmt_val
 
 _FIN_LABELS    = ["매출액", "영업이익", "당기순이익", "자산총계", "부채총계", "자본총계"]
 _DIV_LABELS    = ["주당배당금(원)", "배당성향(%)", "시가배당률(%)", "현금배당총액(백만원)"]
 _RATIO_LABELS  = ["영업이익률", "순이익률", "부채비율", "ROE", "ROA",
                   "매출총이익률", "매출원가율", "총포괄이익률"]
 _ANALYSIS_TABS = ["핵심재무", "배당", "타법인출자", "재무지표", "감사", "최대주주", "직원", "자본변동"]
-
-
-def _fmt_val(val):
-    """금액 포맷 + 색상. (표시문자열, 텍스트 색상) 반환."""
-    if val is None:
-        return "N/A", "gray50"
-    trillion = 1_000_000_000_000
-    billion  = 100_000_000
-    abs_val  = abs(val)
-    if abs_val >= trillion:
-        s = f"{abs_val / trillion:.2f}조"
-    elif abs_val >= billion:
-        s = f"{abs_val / billion:.0f}억"
-    else:
-        s = f"{abs_val:,}원"
-    if val < 0:
-        return f"-{s}", "#FF6B6B"
-    return s, "white"
-
-
-def _fmt_div_val(val, key):
-    """배당 항목별 포맷 + 색상. (표시문자열, 텍스트 색상) 반환."""
-    if val is None:
-        return "N/A", "gray50"
-    if "%" in key:
-        color = "#FF6B6B" if val < 0 else "white"
-        return f"{val:.2f}%", color
-    if "백만원" in key:
-        return _fmt_val(int(val) * 1_000_000)   # 백만원→원 변환 후 조/억 표시
-    return f"{int(val):,}원", "white"
 
 
 def _report_year(report_nm):
@@ -145,16 +78,9 @@ def _report_basename(report_nm, rtype, year):
     return f"{base}_{_QUARTER_BY_MONTH.get(month, month + '월')}"
 
 
-def _fmt_ratio_val(val):
-    """재무비율 포맷 + 색상. (표시문자열, 텍스트 색상) 반환."""
-    if val is None:
-        return "N/A", "gray50"
-    color = "#FF6B6B" if val < 0 else "white"
-    return f"{val:.2f}%", color
-
-
 class DartApp(ctk.CTk):
     def __init__(self):
+        ui_theme.apply_theme()
         super().__init__()
         self.title("DART 공시 다운로더")
         self.geometry("1300x720")
@@ -210,7 +136,7 @@ class DartApp(ctk.CTk):
             row=0, column=2, padx=(4, 0), pady=8
         )
         ctk.CTkLabel(f, text="저장폴더").grid(row=0, column=3, padx=(12, 6), pady=8, sticky="w")
-        self.save_dir_var = tk.StringVar(value=_DEFAULT_DOWNLOADS)
+        self.save_dir_var = tk.StringVar(value=settings.DEFAULT_DOWNLOADS)
         ctk.CTkEntry(f, textvariable=self.save_dir_var).grid(
             row=0, column=4, padx=4, pady=8, sticky="ew"
         )
@@ -249,10 +175,7 @@ class DartApp(ctk.CTk):
         lb_wrap.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(8, 0))
 
         self.listbox = tk.Listbox(
-            lb_wrap, height=6, selectmode=tk.SINGLE,
-            bg="#2b2b2b", fg="white", selectbackground="#1f6aa5",
-            activestyle="none", relief="flat", borderwidth=0,
-            font=("Consolas", 10), exportselection=False,
+            lb_wrap, height=6, selectmode=tk.SINGLE, **ui_theme.LISTBOX_STYLE
         )
         sb = tk.Scrollbar(lb_wrap, orient="vertical", command=self.listbox.yview)
         self.listbox.configure(yscrollcommand=sb.set)
@@ -580,7 +503,7 @@ class DartApp(ctk.CTk):
             )
             for ci, row_data in enumerate(data):
                 val = row_data.get(label)
-                text, color = _fmt_val(val)
+                text, color = fmt_val(val)
                 ctk.CTkLabel(f, text=text, text_color=color,
                              width=col_w, anchor="e").grid(
                     row=ri+2, column=ci+1, padx=4, pady=6
@@ -625,7 +548,7 @@ class DartApp(ctk.CTk):
             if self.corp_list is None:
                 try:
                     self.corp_list = load_corp_list(
-                        api_key, cache_path=_CORPCODE_PATH, log_fn=self._log
+                        api_key, cache_path=settings.CORPCODE_PATH, log_fn=self._log
                     )
                 except Exception as e:
                     self._log(f"오류: {e}")
@@ -772,7 +695,7 @@ class DartApp(ctk.CTk):
             )
             for ci, row_data in enumerate(data):
                 val = row_data.get(label)
-                text, color = _fmt_div_val(val, label)
+                text, color = fmt_div_val(val, label)
                 ctk.CTkLabel(f, text=text, text_color=color,
                              width=col_w, anchor="e").grid(
                     row=ri+2, column=ci+1, padx=4, pady=6
@@ -839,7 +762,7 @@ class DartApp(ctk.CTk):
             )
             for ci, row_data in enumerate(data):
                 val = row_data.get(label)
-                text, color = _fmt_ratio_val(val)
+                text, color = fmt_ratio_val(val)
                 ctk.CTkLabel(f, text=text, text_color=color,
                              width=col_w, anchor="e").grid(
                     row=ri+2, column=ci+1, padx=4, pady=6
@@ -904,7 +827,7 @@ class DartApp(ctk.CTk):
             pct   = row["지분율"]
             bv    = row["기말장부가액"]
             pct_s = f"{pct:.1f}%" if pct is not None else "N/A"
-            bv_s, bv_c = _fmt_val(bv) if bv is not None else ("N/A", "gray50")
+            bv_s, bv_c = fmt_val(bv) if bv is not None else ("N/A", "gray50")
             row_idx = ri + 2
 
             cells = [
