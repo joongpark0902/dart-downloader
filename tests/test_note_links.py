@@ -266,6 +266,37 @@ class DigitLedSeparatorTest(unittest.TestCase):
         self.assertEqual([("n2b", "2")], LINK.findall(m.group(1)))
 
 
+class BeforeTextRawHtmlLeakTest(unittest.TestCase):
+    """before_text가 원본 HTML 60자 창이면 이웃 태그의 '연결'까지 단서로
+    잡힌다 — DigitLedSeparatorTest와 같은 구조지만 필러 문단 없이 붙여서,
+    직전 제목('2. 회계정책 (연결)')의 '(연결)'이 60자 창에 그대로
+    들어오는 자리를 만든다. 참조가 놓인 문장 자체('주석 2 참고
+    바랍니다.')에는 '연결' 단서가 없고, 가장 가까운 앞 제목('6 대 매
+    출 처 현 황')에도 없으므로, 단서를 참조와 같은 텍스트 세그먼트로
+    한정하면 별도 세트로 가야 한다.
+    """
+
+    HTML = (
+        '<h3 id="s1">1. 연결재무제표 주석</h3>'
+        '<h3 id="n2">2. 회계정책 (연결)</h3><p>내용.</p>'
+        '<h3>6 대 매 출 처 현 황</h3>'
+        '<p>주석 2 참고 바랍니다.</p>'
+        '<h3 id="s2">2. 별도재무제표 주석</h3>'
+        '<h3 id="n2b">2. 회계정책</h3><p>별도 내용.</p>'
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = note_links.add_note_links(cls.HTML)
+
+    def test_reference_resolves_to_separate_set_not_neighbouring_heading(self):
+        """'주석 2'는 별도 세트의 n2b로 가야 한다(수정 전엔 이웃 제목의
+        '(연결)'이 60자 창에 걸려 연결 세트의 n2로 샜다)."""
+        m = re.search(r"주석(.*?)참고 바랍니다\.", self.html)
+        self.assertIsNotNone(m)
+        self.assertEqual([("n2b", "2")], LINK.findall(m.group(1)))
+
+
 class ConvertIntegrationTest(unittest.TestCase):
     """convert_to_html이 만든 최종 파일에 주석 링크가 들어 있어야 한다."""
 

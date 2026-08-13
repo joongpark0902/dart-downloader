@@ -224,8 +224,12 @@ def _resolve_set(sets, marks, pos, before_text):
       - 두 세트 제목 다 '연결'을 담지 않으면(감사보고서에서 흔한
         '주석' vs '주석' 같은 경우) 세트 밖 참조는 전부 sets[0]로
         간다 — 근거 없이 첫 세트를 고르는 것과 같다.
-      - before_text는 앞 60자의 원본 HTML을 그대로 본다. 표 옆 칸에
-        '연결'이 있으면 그것도 단서로 잡힌다.
+      - before_text는 참조와 같은 텍스트 세그먼트(태그로 안 끊긴 같은
+        구간 — 보통 같은 문장·같은 칸) 안에서 참조보다 앞쪽만 본다.
+        그래서 이전 제목이나 옆 칸의 '연결'은 더 이상 단서로 새지
+        않는다. 다만 같은 문장이라도 참조 앞에 인라인 태그(<b>·<br>
+        등)가 끼어 있으면 그 앞은 별도 세그먼트라 못 본다 — 그런
+        자리는 직전 제목 휴리스틱으로 넘어간다.
     """
     for s in sets:
         if s.contains(pos):
@@ -257,7 +261,7 @@ def _collect_ref_edits(html, sets):
         seg = html[seg_start:seg_end]
         for m in _REF.finditer(seg):
             abs_start = seg_start + m.start()
-            before = html[max(0, abs_start - 60):abs_start]
+            before = seg[:m.start()]
             note_set = _resolve_set(sets, marks, abs_start, before)
             nums_start = seg_start + m.start(1)
             for nm in _REF_NUM.finditer(m.group(1)):
