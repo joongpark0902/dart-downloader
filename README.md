@@ -163,7 +163,7 @@ python scripts/test_engine.py
 | `xml_fix.py` | DART 비표준 XML 보정 |
 | `dart_engine.py`, `dart_gui.py` | 이전 이름 호환용 shim |
 
-`scripts/` 아래 단계별 도구는 `dart_engine` shim을 통해 그대로 동작한다.
+`scripts/` 아래 단계별 도구는 `dart_engine` shim을 통해 그대로 동작합니다.
 
 **의존성** — `requests`, `customtkinter` 두 개뿐입니다. 나머지는 표준 라이브러리(`xml.etree`, `zipfile`, `threading`)로 해결했습니다.
 

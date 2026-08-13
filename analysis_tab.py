@@ -1,9 +1,9 @@
 """분석 패널.
 
-dart_gui.py의 _build_analysis(65-231행), _on_fs_toggle(329-333행),
-_update_titles(334-347행)를 옮긴 모듈이다. 탭 조립은 analysis.TAB_SPECS 순회로
-바꿨고, 제목 8줄을 개별로 쓰던 _update_titles는 각 모듈의 SCOPE 기반 한 곳으로
-합쳤다. 연결/별도 토글(fs_seg)도 이 패널로 옮겨 왔다.
+dart_gui.py의 _build_analysis, _on_fs_toggle, _update_titles를 옮긴 모듈이다.
+탭 조립은 analysis.TAB_SPECS 순회로 바꿨고, 제목 8줄을 개별로 쓰던
+_update_titles는 각 모듈의 SCOPE 기반 한 곳으로 합쳤다. 연결/별도
+토글(fs_seg)도 이 패널로 옮겨 왔다.
 """
 import customtkinter as ctk
 

@@ -9,7 +9,7 @@ import customtkinter as ctk
 
 import settings
 import ui_theme
-from dart_client import AUDIT_TYPE, list_disclosures, load_corp_list, search_company
+from dart_client import list_disclosures, load_corp_list, search_company
 from dart_viewer import convert_to_html
 from downloader import download_document
 from settings import load_api_key, save_api_key
