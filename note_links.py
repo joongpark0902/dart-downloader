@@ -321,10 +321,20 @@ def add_note_links(body_html):
 
     edits = []
     for s in sets:
+        anchor_at = {}                    # {삽입위치: 그 자리에 먼저 붙인 앵커}
         for no, pos in s.pending:
-            anchor = f"nt{s.index}_{no}"
+            anchor = anchor_at.get(pos)
+            if anchor is None:
+                # 같은 위치에 처음 등록되는 번호만 진짜 id="" 삽입을 받는다.
+                # 합쳐진 제목('4. … 5. …')이나 한 문단 안 여러 항목처럼
+                # 같은 자리에 번호가 둘 이상 몰리면, 같은 요소에 id 속성을
+                # 두 번 넣을 수는 없으니(브라우저가 첫 id만 인정해 뒤 앵커가
+                # 죽는다) 뒤 번호들은 이 앵커를 같이 쓴다 — 어차피 같은
+                # 블록을 가리키므로 의미상으로도 맞다.
+                anchor = f"nt{s.index}_{no}"
+                anchor_at[pos] = anchor
+                edits.append((pos, pos, f' id="{anchor}"'))
             s.items[no] = anchor
-            edits.append((pos, pos, f' id="{anchor}"'))
 
     if not any(s.items for s in sets):
         return body_html

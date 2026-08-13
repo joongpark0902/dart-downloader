@@ -17,7 +17,21 @@ FIXTURES = os.path.join(HERE, "fixtures")
 OUT = os.path.join(HERE, "_out")
 
 LINK = re.compile(r'<a class="nref" href="#([^"]+)">(\d+)</a>')
-ANY_ID = re.compile(r'id="([^"]+)"')
+_TAG = re.compile(r"<[a-zA-Z][^>]*>")
+_FIRST_ID = re.compile(r'\bid="([^"]*)"')
+
+
+def _reachable_ids(html):
+    """실제로 닿을 수 있는 id만 모은다 — 태그 하나에 id="" 속성이 두 번
+    박혀도(중복 삽입 버그) 브라우저는 첫 id만 인정하므로, 태그별 첫
+    id="..."만 진짜로 친다. 문서 전체를 훑는 나이브한 정규식이면 중복
+    속성의 두 번째 id도 "있다"고 잘못 세어 죽은 앵커를 놓친다."""
+    ids = set()
+    for m in _TAG.finditer(html):
+        idm = _FIRST_ID.search(m.group())
+        if idm:
+            ids.add(idm.group(1))
+    return ids
 
 
 def _heading_text(html, anchor):
@@ -62,7 +76,7 @@ class NoteLinkTest(unittest.TestCase):
                 links = self._links(html)
                 self.assertGreaterEqual(len(links), MIN_LINKS,
                                          f"링크가 너무 적다: {len(links)}개")
-                ids = set(ANY_ID.findall(html))
+                ids = _reachable_ids(html)
                 broken = [t for t, _ in links if t not in ids]
                 self.assertEqual([], broken, f"깨진 앵커: {broken}")
 
@@ -331,6 +345,39 @@ class ClauseScopedEvidenceTest(unittest.TestCase):
         links = LINK.findall(para)
         self.assertEqual([("c25", "25"), ("s23", "23")], links,
                           "뒤 절의 주석23이 앞 절의 '연결'에 오염돼 c23으로 새면 안 된다")
+
+
+class SharedOffsetAnchorTest(unittest.TestCase):
+    """합쳐진 제목('4. 종속기업의 현황 5. 관계기업…')처럼 한 블록이 번호
+    둘을 같은 삽입 위치에 동시에 등록하면, id="" 속성을 두 번 넣는 대신
+    (브라우저가 첫 id만 인정해 뒤 앵커가 죽는다) 두 번호가 같은 앵커를
+    공유해야 한다 — 어차피 같은 블록을 가리키므로 의미상으로도 맞다.
+    한강버스 감사보고서_2025에서 실제로 확인한 구조(합쳐진 제목)를 옮겼다.
+    """
+
+    HTML = (
+        '<h3>주석</h3>'
+        '<h3>18. 기타지분상품 19. 배당금 지급제한</h3><p>내용.</p>'
+        '<p>기타지분상품은 주석18, 배당금 지급제한은 주석19를 참고.</p>'
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = note_links.add_note_links(cls.HTML)
+
+    def test_no_duplicate_id_attribute_on_one_tag(self):
+        """한 태그 안에 id="" 속성이 두 번 들어가면 안 된다."""
+        self.assertNotRegex(self.html, r'<[a-zA-Z][^>]*\bid="[^"]*"[^>]*\bid="')
+
+    def test_both_note_numbers_stay_reachable(self):
+        """18과 19 둘 다 링크되고, 그 링크가 가리키는 앵커가 실제로 있어야
+        한다(first-id-wins 기준)."""
+        links = LINK.findall(self.html)
+        nums = {n for _, n in links}
+        self.assertEqual({"18", "19"}, nums)
+        ids = _reachable_ids(self.html)
+        broken = [t for t, _ in links if t not in ids]
+        self.assertEqual([], broken, f"깨진 앵커: {broken}")
 
 
 class ConvertIntegrationTest(unittest.TestCase):
