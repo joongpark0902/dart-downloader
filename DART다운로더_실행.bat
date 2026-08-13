@@ -8,7 +8,7 @@ rem python.exe는 Python 재단 서명이 있어 차단되지 않는다.
 where pythonw >nul 2>&1
 if errorlevel 1 goto no_python
 
-start "" pythonw "%~dp0dart_gui.py"
+start "" pythonw "%~dp0app.py"
 exit /b 0
 
 :no_python

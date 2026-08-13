@@ -20,7 +20,6 @@ from financials import (
 from ui_theme import fmt_val
 
 # 재무지표 탭 컨텍스트를 얻기 위해 모듈 자체를 import 한다.
-# app.ctx_of(module) 접근자는 다음 작업(Task 10)에서 도입된다.
 from analysis import ratio
 
 TITLE = "핵심재무"
@@ -148,10 +147,9 @@ def load(app, ctx):
     corp     = app.selected_corp
     api_key  = app.download_panel.api_key_var.get().strip()
     end_year = str(int(app.download_panel.end_year_var.get()) - 1)
-    # TODO(Task10): fs_seg(연결/별도 토글)는 분석 패널로 옮겨질 예정. 지금은 app.fs_seg 로 읽는다.
-    fs_div   = "CFS" if app.fs_seg.get() == "연결" else "OFS"
+    fs_div   = "CFS" if app.analysis_panel.fs_mode == "연결" else "OFS"
 
-    ratio_ctx = app.ctx_of(ratio)  # ctx_of 는 Task 10에서 도입 예정
+    ratio_ctx = app.ctx_of(ratio)
 
     app.after(0, lambda: render(ctx, "loading"))
     app.after(0, lambda: ratio.render(ratio_ctx, "loading"))
