@@ -4,7 +4,7 @@ import zipfile
 
 import requests
 
-from xml_fix import _DART_BR_ENTITY
+from xml_fix import DART_BR_ENTITY
 
 # ── 내부 상수 ────────────────────────────────────────────────────────────────
 _DOC_URL = "https://opendart.fss.or.kr/api/document.xml"
@@ -38,7 +38,7 @@ def _read_document_name(path):
         return ""
     # 제목 안의 태그·엔티티 제거
     text = re.sub(r"<[^>]*>", "", m.group(1))
-    text = text.replace(_DART_BR_ENTITY, " ")
+    text = text.replace(DART_BR_ENTITY, " ")
     return " ".join(text.split())
 
 

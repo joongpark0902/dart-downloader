@@ -145,3 +145,6 @@ def _parse_tag(s, i, n):
 
 # HTML 변환 쪽에서도 이 표식을 <br>로 펴야 한다
 BR_SENTINEL = _BR_SENTINEL
+
+# 다운로드 쪽에서도 <DOCUMENT-NAME>에서 이 엔티티를 걷어낸 뒤 XML을 손본다
+DART_BR_ENTITY = _DART_BR_ENTITY
