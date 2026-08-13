@@ -1,0 +1,141 @@
+"""분석 탭: 타법인출자.
+
+dart_gui.py의 _render_equity / _load_equity 를 그대로 옮긴 모듈이다.
+위젯 접근은 self._eqt_content → ctx.content, self._eqt_title → ctx.title_label 로,
+엔진 호출 인자는 app.download_panel.* / app.selected_corp 로 바꿨다.
+"""
+import threading
+
+import customtkinter as ctk
+
+from financials import get_equity_investments
+from ui_theme import fmt_val
+
+TITLE = "타법인출자"
+SCOPE = "1y"
+
+
+class Ctx:
+    """탭 위젯을 담아 두는 상태 객체."""
+
+    def __init__(self, title_label, content):
+        self.title_label = title_label
+        self.content = content
+
+
+def build(parent, app):
+    """타법인출자 탭 위젯을 만든다. (dart_gui.py _build_analysis 의 타법인출자 절 이식)"""
+    parent.grid_columnconfigure(0, weight=1)
+    parent.grid_rowconfigure(1, weight=1)
+
+    title_label = ctk.CTkLabel(
+        parent, text="기업분석 — 타법인출자",
+        font=ctk.CTkFont(size=13, weight="bold")
+    )
+    title_label.grid(row=0, column=0, padx=12, pady=(10, 4), sticky="w")
+
+    content = ctk.CTkFrame(parent, fg_color="transparent")
+    content.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
+    content.grid_columnconfigure(0, weight=1)
+    content.grid_rowconfigure(0, weight=1)
+
+    return Ctx(title_label, content)
+
+
+def render(ctx, state, data=None, year=None, corp_name=""):
+    """타법인출자 탭 컨텐츠를 갱신한다. state: 'initial'|'loading'|'done'|'error'"""
+    for w in ctx.content.winfo_children():
+        w.destroy()
+
+    if state == "initial":
+        ctk.CTkLabel(ctx.content,
+                     text="회사를 선택하면 출자 현황이 표시됩니다.",
+                     text_color="gray").grid(row=0, column=0)
+        return
+    if state == "loading":
+        ctk.CTkLabel(ctx.content,
+                     text="불러오는 중...", text_color="gray").grid(row=0, column=0)
+        return
+    if state == "error":
+        ctk.CTkLabel(ctx.content,
+                     text="데이터를 불러오지 못했습니다.", text_color="#FF6B6B").grid(row=0, column=0)
+        return
+    if not data:
+        ctk.CTkLabel(ctx.content,
+                     text="출자 내역이 없습니다.", text_color="gray").grid(row=0, column=0)
+        return
+
+    # ── 정보 헤더 ──
+    info_frame = ctk.CTkFrame(ctx.content, fg_color="transparent")
+    info_frame.grid(row=0, column=0, sticky="ew", padx=8, pady=(4, 0))
+    ctk.CTkLabel(info_frame,
+                 text=f"총 {len(data)}건  ({year}년 기준)",
+                 text_color="gray70").pack(side="left")
+
+    # ── 스크롤 테이블 ──
+    scroll = ctk.CTkScrollableFrame(ctx.content)
+    scroll.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
+    ctx.content.grid_rowconfigure(1, weight=1)
+
+    COL_W = [200, 105, 72, 115]   # 법인명, 최초취득일, 지분율, 기말장부가액
+    HEADERS = ["법인명", "최초취득일", "지분율", "기말장부가액"]
+
+    # 헤더 행
+    for ci, (h, w) in enumerate(zip(HEADERS, COL_W)):
+        anchor = "w" if ci == 0 else "e"
+        ctk.CTkLabel(scroll, text=h, font=ctk.CTkFont(weight="bold"),
+                     width=w, anchor=anchor).grid(
+            row=0, column=ci, padx=(0 if ci else 4, 4), pady=4, sticky=anchor
+        )
+
+    sep = ctk.CTkFrame(scroll, height=1, fg_color="gray40")
+    sep.grid(row=1, column=0, columnspan=4, sticky="ew", pady=2)
+
+    def _pct_color(pct):
+        if pct is None:  return "gray50"
+        if pct >= 50:    return "#63B3ED"   # 자회사 — 파랑
+        if pct >= 20:    return "#68D391"   # 관계사 — 초록
+        return "gray70"                      # 기타
+
+    for ri, row in enumerate(data):
+        pct   = row["지분율"]
+        bv    = row["기말장부가액"]
+        pct_s = f"{pct:.1f}%" if pct is not None else "N/A"
+        bv_s, bv_c = fmt_val(bv) if bv is not None else ("N/A", "gray50")
+        row_idx = ri + 2
+
+        cells = [
+            (row["법인명"],   "w", "white"),
+            (row["최초취득일"], "e", "gray70"),
+            (pct_s,          "e", _pct_color(pct)),
+            (bv_s,           "e", bv_c),
+        ]
+        for ci, (text, anchor, color) in enumerate(cells):
+            ctk.CTkLabel(scroll, text=text, text_color=color,
+                         width=COL_W[ci], anchor=anchor).grid(
+                row=row_idx, column=ci,
+                padx=(0 if ci else 4, 4), pady=2, sticky=anchor
+            )
+
+
+def load(app, ctx):
+    """엔진을 스레드에서 불러 결과로 render 를 부른다."""
+    corp     = app.selected_corp
+    api_key  = app.download_panel.api_key_var.get().strip()
+    end_year = str(int(app.download_panel.end_year_var.get()) - 1)
+
+    app.after(0, lambda: render(ctx, "loading"))
+
+    def run():
+        try:
+            data = get_equity_investments(
+                api_key, corp["corp_code"], end_year, log_fn=app.download_panel.log
+            )
+            app.after(0, lambda: render(
+                ctx, "done", data=data, year=end_year, corp_name=corp["corp_name"]
+            ))
+        except Exception as e:
+            app.download_panel.log(f"타법인출자 오류: {e}")
+            app.after(0, lambda: render(ctx, "error"))
+
+    threading.Thread(target=run, daemon=True).start()
