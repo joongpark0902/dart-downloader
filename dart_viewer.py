@@ -38,7 +38,6 @@ td.tu { background: #f0f9ff; }
 .note { margin: 10px 0; padding: 8px 12px; background: #fafafa; border-left: 3px solid #e5e7eb; }
 
 /* ── 목차 사이드바 ─────────────────────────────────────────── */
-html { scroll-behavior: smooth; }
 .wrap { display: flex; align-items: flex-start; gap: 20px;
         max-width: 1320px; margin: 0 auto; padding: 20px 16px; }
 .wrap > .page { flex: 1; min-width: 0; margin: 0; padding: 32px 40px; overflow-x: auto; }
@@ -57,7 +56,10 @@ html { scroll-behavior: smooth; }
 .toc a.lv0 { font-weight: 700; color: #1e3a8a; margin-top: 6px; }
 .toc a.lv1 { padding-left: 22px; }
 .toc a.lv2 { padding-left: 34px; color: #6b7280; font-size: 12px; }
-:target { background: #fef9c3; scroll-margin-top: 16px; }
+/* 목차·주석 링크는 애니메이션 없이 즉시 이동한다.
+   긴 사업보고서에서 부드러운 스크롤은 수천 줄을 훑고 지나가 눈이 아프다. */
+h1, h2, h3, h4, h5, p[id] { scroll-margin-top: 16px; }
+:target { background: #fef9c3; }
 
 @media (max-width: 980px) {
   .wrap { display: block; padding: 12px; }

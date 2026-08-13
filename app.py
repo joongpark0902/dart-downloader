@@ -15,7 +15,6 @@ class DartApp(ctk.CTk):
         self.minsize(1000, 580)
 
         self.selected_corp = None
-        self.fin_data = None          # 재무지표 탭이 받아 둔 데이터. 재무비율이 재사용
 
         self._build_ui()
 
@@ -37,7 +36,6 @@ class DartApp(ctk.CTk):
     def set_selected_corp(self, corp):
         """다운로드 패널이 회사를 고르면 분석 패널에 알린다."""
         self.selected_corp = corp
-        self.fin_data = None
         self.analysis_panel.set_corp(corp)
 
     def ctx_of(self, module):
