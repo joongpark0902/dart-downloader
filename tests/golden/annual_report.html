@@ -54,6 +54,12 @@ td.tu { background: #f0f9ff; }
 h1, h2, h3, h4, h5, p[id] { scroll-margin-top: 16px; }
 :target { background: #fef9c3; }
 
+/* ── 주석 참조 링크 ────────────────────────────────────────── */
+a.nref { color: #2563eb; text-decoration: none;
+         border-bottom: 1px dotted #93c5fd; }
+a.nref:hover { background: #eff6ff; border-bottom-color: #2563eb; }
+@media print { a.nref { color: inherit; border-bottom: none; } }
+
 @media (max-width: 980px) {
   .wrap { display: block; padding: 12px; }
   .toc { position: static; width: auto; max-height: 320px; margin-bottom: 16px; }
@@ -72,31 +78,31 @@ h1, h2, h3, h4, h5, p[id] { scroll-margin-top: 16px; }
 <div class="section-1"><h3 id="sec1">III. 재무에 관한 사항</h3>
 <div class="section-2"><h4 id="sec2">2-1. 연결 재무상태표</h4>
 <div class="tg"><table><tbody>
-<tr><td>재고자산(주석3,4)</td><td>1,000</td></tr>
-<tr><td>매출채권(주석 8 참조)</td><td>2,000</td></tr>
+<tr><td>재고자산(주석<a class="nref" href="#sec6">3</a>,<a class="nref" href="#sec7">4</a>)</td><td>1,000</td></tr>
+<tr><td>매출채권(주석 <a class="nref" href="#sec10">8</a> 참조)</td><td>2,000</td></tr>
 </tbody></table></div>
 </div>
 <div class="section-2"><h4 id="sec3">3. 연결재무제표 주석</h4></div>
 <div class="section-2"><h4 id="sec4">1. 지배기업의 개요 (연결)</h4><p>지배기업의 개요입니다.</p></div>
-<div class="section-2"><h4 id="sec5">2. 중요한 회계처리방침 (연결)</h4><p>주석 4, 5에서 설명하고 있습니다.</p></div>
+<div class="section-2"><h4 id="sec5">2. 중요한 회계처리방침 (연결)</h4><p>주석 <a class="nref" href="#sec7">4</a>, <a class="nref" href="#sec7">5</a>에서 설명하고 있습니다.</p></div>
 <div class="section-2"><h4 id="sec6">3. 중요한 회계정책 (연결)</h4><p>회계정책입니다.</p></div>
 <div class="section-2"><h4 id="sec7">4. 종속기업의 현황 5. 관계기업및공동기업투자주식 (연결)</h4><p>합쳐진 제목입니다.</p></div>
 <div class="section-2"><h4 id="sec8">6. 영업부문 (연결)</h4><p>영업부문입니다.</p></div>
 <div class="section-2"><h4 id="sec9">7-1. 범주별 금융상품 (연결)</h4><p>범주별 금융상품입니다.</p></div>
 <div class="section-2"><h4 id="sec10">8. 매출채권 및 기타채권 (연결)</h4><p>매출채권입니다.</p></div>
 <div class="section-2"><h4 id="sec11">16. 사채, 차입금 (연결)</h4><p>(1) 차입금 내역<span style="font-weight:bold">굵게</span></p></div>
-<div class="section-2"><h4 id="sec12">17. 충당부채 (연결)</h4><p>추정의 주요 가정- 주석 17 및 28: 충당부채와 우발부채</p></div>
+<div class="section-2"><h4 id="sec12">17. 충당부채 (연결)</h4><p>추정의 주요 가정- 주석 <a class="nref" href="#sec12">17</a> 및 <a class="nref" href="#sec13">28</a>: 충당부채와 우발부채</p></div>
 <div class="section-2"><h4 id="sec13">28. 우발부채 및 약정사항 (연결)</h4><p>재무제표 주석의 2. 재무제표 작성기준을 참고하십시오.</p></div>
 <div class="section-2"><h4 id="sec14">4. 재무제표</h4>
 <div class="tg"><table><tbody>
-<tr><td>재고자산(주석3,4)</td><td>900</td></tr>
+<tr><td>재고자산(주석<a class="nref" href="#sec18">3</a>,4)</td><td>900</td></tr>
 </tbody></table></div>
 </div>
 <div class="section-2"><h4 id="sec15">5. 재무제표 주석</h4></div>
 <div class="section-2"><h4 id="sec16">1. 회사의 개요</h4><p>회사의 개요입니다.</p></div>
 <div class="section-2"><h4 id="sec17">2. 중요한 회계처리방침</h4><p>(11) 자산손상은 별도 항목이 아닙니다.</p></div>
 <div class="section-2"><h4 id="sec18">3. 중요한 회계정책</h4><p>1) 리스제공자도 항목이 아닙니다.</p></div>
-<div class="section-2"><h4 id="sec19">15. 사채, 차입금</h4><p>분류되어 있습니다(주석 15 참조).</p></div>
+<div class="section-2"><h4 id="sec19">15. 사채, 차입금</h4><p>분류되어 있습니다(주석 <a class="nref" href="#sec19">15</a> 참조).</p></div>
 <div class="section-2"><h4 id="sec20">99. 없는번호참조</h4><p>없는 번호입니다(주석 77 참조).</p></div>
 </div>
 </div>

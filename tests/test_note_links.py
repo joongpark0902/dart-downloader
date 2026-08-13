@@ -42,11 +42,21 @@ class NoteLinkTest(unittest.TestCase):
         return LINK.findall(html)
 
     def test_every_link_target_exists(self):
-        """href가 가리키는 id가 문서에 실제로 있어야 한다."""
+        """href가 가리키는 id가 문서에 실제로 있어야 한다.
+
+        링크가 0개여도 이 검사는 통과해 버린다 — 기능이 통째로 죽어도
+        못 잡는다. annual_report·audit_report 픽스처는 각각 9개·5개를
+        내므로, 절반에도 못 미치는 3개를 바닥으로 잡아 총체적 파손을
+        걸러낸다.
+        """
+        MIN_LINKS = 3
         for name, html in (("annual", self.annual), ("audit", self.audit)):
             with self.subTest(doc=name):
+                links = self._links(html)
+                self.assertGreaterEqual(len(links), MIN_LINKS,
+                                         f"링크가 너무 적다: {len(links)}개")
                 ids = set(ANY_ID.findall(html))
-                broken = [t for t, _ in self._links(html) if t not in ids]
+                broken = [t for t, _ in links if t not in ids]
                 self.assertEqual([], broken, f"깨진 앵커: {broken}")
 
     def test_consolidated_and_separate_sets_differ(self):
@@ -99,6 +109,34 @@ class NoteLinkTest(unittest.TestCase):
         """주석이 없는 문서는 그대로 돌려준다."""
         plain = "<p>주석이 없는 문서입니다.</p>"
         self.assertEqual(plain, note_links.add_note_links(plain))
+
+
+class ConvertIntegrationTest(unittest.TestCase):
+    """convert_to_html이 만든 최종 파일에 주석 링크가 들어 있어야 한다."""
+
+    def test_converted_file_has_note_links(self):
+        os.makedirs(OUT, exist_ok=True)
+        out_path = os.path.join(OUT, "integration.html")
+        dart_viewer.convert_to_html(
+            os.path.join(FIXTURES, "audit_report.xml"), out_path
+        )
+        with open(out_path, encoding="utf-8") as f:
+            html = f.read()
+        self.assertTrue(LINK.search(html), "주석 링크가 없다")
+        self.assertIn(".nref", html, "주석 링크 스타일이 없다")
+
+    def test_toc_links_are_not_touched(self):
+        """목차 사이드바의 링크는 주석 링크로 오인되면 안 된다."""
+        os.makedirs(OUT, exist_ok=True)
+        out_path = os.path.join(OUT, "integration_toc.html")
+        dart_viewer.convert_to_html(
+            os.path.join(FIXTURES, "annual_report.xml"), out_path
+        )
+        with open(out_path, encoding="utf-8") as f:
+            html = f.read()
+        nav = re.search(r"<nav class=\"toc\">.*?</nav>", html, re.S)
+        self.assertIsNotNone(nav, "목차가 없다")
+        self.assertNotIn('class="nref"', nav.group(0))
 
 
 if __name__ == "__main__":

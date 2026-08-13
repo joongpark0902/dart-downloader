@@ -23,6 +23,10 @@
 
 **공시 원문 다운로드** — 회사명·기간·보고서 종류로 검색해 DART 원문(XML)을 일괄 저장하고, **왼쪽 목차에서 클릭하면 해당 장으로 바로 가는 HTML**로 변환합니다. 사업·반기·분기보고서(정기공시)뿐 아니라 **감사보고서 단독공시**도 받을 수 있어, 사업보고서를 제출하지 않는 **비상장 외부감사대상 법인**의 재무제표·주석 원문까지 확보됩니다. 파일은 `사업보고서_2024.html`, `연결감사보고서_2025.html`처럼 접수번호가 아닌 사람이 읽을 수 있는 이름으로 저장됩니다.
 
+- 좌측 목차와 본문의 주석 참조(`(주석3,4)`)를 누르면 해당 위치로 즉시 이동합니다.
+  사업보고서처럼 연결·별도 주석이 따로 있는 문서는 참조가 놓인 재무제표에 맞는
+  주석으로 갑니다.
+
 **3개년 재무분석 — 8개 탭**
 
 | 탭 | 내용 |
@@ -141,16 +145,25 @@ python scripts/test_engine.py
 
 ---
 
-## 구조
+## 파일 구조
 
-```
-dart-downloader/
-├── dart_engine.py       # OpenDART API 래퍼 (공개 함수 19개, GUI 비의존)
-├── dart_gui.py          # customtkinter GUI (8개 분석 탭)
-├── claude_theme.json    # GUI 테마
-├── dart_downloader.spec # PyInstaller 빌드 설정
-└── scripts/             # 단계별 API 검증 스크립트
-```
+| 파일 | 역할 |
+|---|---|
+| `app.py` | 진입점. 창 셸과 공유 상태 |
+| `settings.py` | 실행 경로·인증키 저장 |
+| `ui_theme.py` | 테마·공통 위젯 스타일·표시 포맷 |
+| `download_tab.py` | 좌측 다운로드 패널 (검색·조회옵션·로그) |
+| `analysis_tab.py` | 우측 분석 패널 (탭 컨테이너·연결/별도 토글) |
+| `analysis/` | 분석 탭 8개 (재무지표·재무비율·배당·타법인출자·감사의견·주주현황·직원현황·자본변동) |
+| `dart_client.py` | CORPCODE 로드·회사 검색·공시 목록 조회 |
+| `downloader.py` | 문서 다운로드·압축해제·파일명 정리 |
+| `financials.py` | 재무 API 파싱·3개년 집계·비율 계산 |
+| `dart_viewer.py` | DART XML → 읽기용 HTML (목차 포함) |
+| `note_links.py` | 주석 참조를 주석 본문으로 잇는 링크 생성 |
+| `xml_fix.py` | DART 비표준 XML 보정 |
+| `dart_engine.py`, `dart_gui.py` | 이전 이름 호환용 shim |
+
+`scripts/` 아래 단계별 도구는 `dart_engine` shim을 통해 그대로 동작한다.
 
 **의존성** — `requests`, `customtkinter` 두 개뿐입니다. 나머지는 표준 라이브러리(`xml.etree`, `zipfile`, `threading`)로 해결했습니다.
 

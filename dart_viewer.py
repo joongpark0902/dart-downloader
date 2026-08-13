@@ -3,6 +3,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
+import note_links
 from xml_fix import BR_SENTINEL, fix_xml
 
 
@@ -60,6 +61,12 @@ td.tu { background: #f0f9ff; }
    긴 사업보고서에서 부드러운 스크롤은 수천 줄을 훑고 지나가 눈이 아프다. */
 h1, h2, h3, h4, h5, p[id] { scroll-margin-top: 16px; }
 :target { background: #fef9c3; }
+
+/* ── 주석 참조 링크 ────────────────────────────────────────── */
+a.nref { color: #2563eb; text-decoration: none;
+         border-bottom: 1px dotted #93c5fd; }
+a.nref:hover { background: #eff6ff; border-bottom-color: #2563eb; }
+@media print { a.nref { color: inherit; border-bottom: none; } }
 
 @media (max-width: 980px) {
   .wrap { display: block; padding: 12px; }
@@ -272,6 +279,11 @@ def convert_to_html(xml_path, output_path, log_fn=None):
 
     toc = []
     body_html = build_body_html(root, toc)
+
+    try:
+        body_html = note_links.add_note_links(body_html)
+    except Exception as e:                      # noqa: BLE001
+        log(f"주석 링크 생략 (원인: {e})")
 
     toc_html = _build_toc_html(toc)
     if toc_html:

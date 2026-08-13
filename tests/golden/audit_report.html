@@ -54,6 +54,12 @@ td.tu { background: #f0f9ff; }
 h1, h2, h3, h4, h5, p[id] { scroll-margin-top: 16px; }
 :target { background: #fef9c3; }
 
+/* ── 주석 참조 링크 ────────────────────────────────────────── */
+a.nref { color: #2563eb; text-decoration: none;
+         border-bottom: 1px dotted #93c5fd; }
+a.nref:hover { background: #eff6ff; border-bottom-color: #2563eb; }
+@media print { a.nref { color: inherit; border-bottom: none; } }
+
 @media (max-width: 980px) {
   .wrap { display: block; padding: 12px; }
   .toc { position: static; width: auto; max-height: 320px; margin-bottom: 16px; }
@@ -72,21 +78,21 @@ h1, h2, h3, h4, h5, p[id] { scroll-margin-top: 16px; }
 <div class="section-1"><h3 id="sec1">(첨부)재 무 제 표</h3>
 <div class="section-2"><h4 id="sec2">재 무 상 태 표</h4>
 <div class="tg"><table><tbody>
-<tr><td class="te">현금및현금성자산(주석3,4)</td><td>5,000</td></tr>
-<tr><td class="te">매출채권(주석14,15)</td><td>6,000</td></tr>
-<tr><td class="te">급여(주석17)</td><td>700</td></tr>
+<tr><td class="te">현금및현금성자산(주석<a class="nref" href="#nt0_3">3</a>,<a class="nref" href="#nt0_4">4</a>)</td><td>5,000</td></tr>
+<tr><td class="te">매출채권(주석<a class="nref" href="#nt0_14">14</a>,<a class="nref" href="#nt0_15">15</a>)</td><td>6,000</td></tr>
+<tr><td class="te">급여(주석<a class="nref" href="#nt0_17">17</a>)</td><td>700</td></tr>
 </tbody></table></div>
 </div>
 <div class="section-2"><h4 id="sec3">주석</h4>
-<p>1. 회사의 개요당사는 테스트 목적으로 설립되었습니다.</p>
-<p>2. 재무제표 작성기준(1) 회계기준의 적용</p>
+<p id="nt0_1">1. 회사의 개요당사는 테스트 목적으로 설립되었습니다.</p>
+<p id="nt0_2">2. 재무제표 작성기준(1) 회계기준의 적용</p>
 <p>(11) 자산손상은 하위 항목입니다.</p>
-<p>3. 유의적 회계정책</p>
-<p>4. 사용이 제한된 금융상품없습니다.</p>
-<p>14. 특수관계자(1) 특수관계자 현황</p>
-<p>15. 현금흐름표당기와 전기의 내역입니다.</p>
-<p>16. 주당손익(1) 가중평균 유통보통주식수</p>
-<p>(3) 반희석 효과로 기본주당손익과 희석주당손익은 동일합니다.17. 부가가치 관련자료당기와 전기의 자료는 다음과 같습니다.</p>
+<p id="nt0_3">3. 유의적 회계정책</p>
+<p id="nt0_4">4. 사용이 제한된 금융상품없습니다.</p>
+<p id="nt0_14">14. 특수관계자(1) 특수관계자 현황</p>
+<p id="nt0_15">15. 현금흐름표당기와 전기의 내역입니다.</p>
+<p id="nt0_16">16. 주당손익(1) 가중평균 유통보통주식수</p>
+<p id="nt0_17">(3) 반희석 효과로 기본주당손익과 희석주당손익은 동일합니다.17. 부가가치 관련자료당기와 전기의 자료는 다음과 같습니다.</p>
 </div>
 </div>
 <div class="section-1"><h3 id="sec4">외부감사 실시내용</h3>
