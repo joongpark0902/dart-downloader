@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>비상장테스트 — 감사보고서</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #f5f5f5; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+       font-size: 13px; color: #1a1a1a; line-height: 1.6; }
+.page { max-width: 960px; margin: 0 auto; background: #fff;
+        padding: 40px 48px; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
+h1 { font-size: 1.6em; font-weight: 700; margin: 24px 0 16px; color: #111; border-bottom: 2px solid #2563eb; padding-bottom: 8px; }
+h2 { font-size: 1.25em; font-weight: 700; margin: 24px 0 10px; color: #1d4ed8; border-left: 4px solid #2563eb; padding-left: 10px; }
+h3 { font-size: 1.1em;  font-weight: 700; margin: 18px 0 8px;  color: #1e40af; }
+h4 { font-size: 1.0em;  font-weight: 700; margin: 14px 0 6px;  color: #374151; }
+h5 { font-size: 0.95em; font-weight: 700; margin: 10px 0 4px;  color: #6b7280; }
+p  { margin: 6px 0; }
+hr.pgbrk { border: none; border-top: 1px dashed #d1d5db; margin: 20px 0; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0 16px; font-size: 12px; }
+th, td { border: 1px solid #d1d5db; padding: 5px 8px; word-break: keep-all; }
+th { background: #eff6ff; font-weight: 700; }
+td.te { background: #fafafa; }
+td.tu { background: #f0f9ff; }
+.tg { margin: 8px 0; }
+.cover { text-align: center; margin-bottom: 32px; }
+.cover h1 { border: none; }
+.section-1 { margin-top: 32px; }
+.section-2 { margin: 16px 0 8px 12px; }
+.section-3 { margin: 10px 0 6px 20px; }
+.note { margin: 10px 0; padding: 8px 12px; background: #fafafa; border-left: 3px solid #e5e7eb; }
+
+/* ── 목차 사이드바 ─────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+.wrap { display: flex; align-items: flex-start; gap: 20px;
+        max-width: 1320px; margin: 0 auto; padding: 20px 16px; }
+.wrap > .page { flex: 1; min-width: 0; margin: 0; padding: 32px 40px; overflow-x: auto; }
+.tg { overflow-x: auto; }
+.toc { position: sticky; top: 20px; width: 268px; flex: none;
+       max-height: calc(100vh - 40px); overflow-y: auto;
+       background: #fff; border: 1px solid #e5e7eb; border-radius: 6px;
+       padding: 14px 8px 16px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.toc .toc-h { font-size: 12px; font-weight: 700; letter-spacing: .08em;
+              color: #6b7280; padding: 0 10px 10px; border-bottom: 1px solid #e5e7eb;
+              margin-bottom: 8px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 4px;
+         color: #374151; text-decoration: none; font-size: 12.5px;
+         line-height: 1.45; word-break: keep-all; border-left: 2px solid transparent; }
+.toc a:hover { background: #eff6ff; color: #1d4ed8; }
+.toc a.lv0 { font-weight: 700; color: #1e3a8a; margin-top: 6px; }
+.toc a.lv1 { padding-left: 22px; }
+.toc a.lv2 { padding-left: 34px; color: #6b7280; font-size: 12px; }
+:target { background: #fef9c3; scroll-margin-top: 16px; }
+
+@media (max-width: 980px) {
+  .wrap { display: block; padding: 12px; }
+  .toc { position: static; width: auto; max-height: 320px; margin-bottom: 16px; }
+  .wrap > .page { padding: 24px 20px; }
+}
+@media print { .toc { display: none; } .wrap { display: block; } }
+</style>
+</head>
+<body>
+<div class="wrap"><nav class="toc"><div class="toc-h">목차</div><a class="lv0" href="#sec1">(첨부)재 무 제 표</a><a class="lv1" href="#sec2">재 무 상 태 표</a><a class="lv1" href="#sec3">주석</a><a class="lv0" href="#sec4">외부감사 실시내용</a><a class="lv1" href="#sec5">1. 감사대상업무</a><a class="lv1" href="#sec6">3. 주요 감사실시내용</a></nav><div class="page">
+<div class="document">
+
+
+<div class="cover"><h1>감 사 보 고 서</h1></div>
+<div class="body">
+<div class="section-1"><h3 id="sec1">(첨부)재 무 제 표</h3>
+<div class="section-2"><h4 id="sec2">재 무 상 태 표</h4>
+<div class="tg"><table><tbody>
+<tr><td class="te">현금및현금성자산(주석3,4)</td><td>5,000</td></tr>
+<tr><td class="te">매출채권(주석14,15)</td><td>6,000</td></tr>
+<tr><td class="te">급여(주석17)</td><td>700</td></tr>
+</tbody></table></div>
+</div>
+<div class="section-2"><h4 id="sec3">주석</h4>
+<p>1. 회사의 개요당사는 테스트 목적으로 설립되었습니다.</p>
+<p>2. 재무제표 작성기준(1) 회계기준의 적용</p>
+<p>(11) 자산손상은 하위 항목입니다.</p>
+<p>3. 유의적 회계정책</p>
+<p>4. 사용이 제한된 금융상품없습니다.</p>
+<p>14. 특수관계자(1) 특수관계자 현황</p>
+<p>15. 현금흐름표당기와 전기의 내역입니다.</p>
+<p>16. 주당손익(1) 가중평균 유통보통주식수</p>
+<p>(3) 반희석 효과로 기본주당손익과 희석주당손익은 동일합니다.17. 부가가치 관련자료당기와 전기의 자료는 다음과 같습니다.</p>
+</div>
+</div>
+<div class="section-1"><h3 id="sec4">외부감사 실시내용</h3>
+<div class="section-2"><h4 id="sec5">1. 감사대상업무</h4><p>감사대상업무입니다.</p></div>
+<div class="section-2"><h4 id="sec6">3. 주요 감사실시내용</h4><p>주요 감사실시내용입니다.</p></div>
+</div>
+</div>
+</div>
+</div></div>
+</body>
+</html>

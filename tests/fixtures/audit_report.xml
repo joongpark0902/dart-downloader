@@ -1,0 +1,31 @@
+<DOCUMENT>
+<DOCUMENT-NAME>감사보고서</DOCUMENT-NAME>
+<COMPANY-NAME>비상장테스트</COMPANY-NAME>
+<COVER><COVER-TITLE>감 사 보 고 서</COVER-TITLE></COVER>
+<BODY>
+<SECTION-1><TITLE>(첨부)재 무 제 표</TITLE>
+<SECTION-2><TITLE>재 무 상 태 표</TITLE>
+<TABLE-GROUP><TABLE><TBODY>
+<TR><TE>현금및현금성자산(주석3,4)</TE><TD>5,000</TD></TR>
+<TR><TE>매출채권(주석14,15)</TE><TD>6,000</TD></TR>
+<TR><TE>급여(주석17)</TE><TD>700</TD></TR>
+</TBODY></TABLE></TABLE-GROUP>
+</SECTION-2>
+<SECTION-2><TITLE>주석</TITLE>
+<P>1. 회사의 개요당사는 테스트 목적으로 설립되었습니다.</P>
+<P>2. 재무제표 작성기준(1) 회계기준의 적용</P>
+<P>(11) 자산손상은 하위 항목입니다.</P>
+<P>3. 유의적 회계정책</P>
+<P>4. 사용이 제한된 금융상품없습니다.</P>
+<P>14. 특수관계자(1) 특수관계자 현황</P>
+<P>15. 현금흐름표당기와 전기의 내역입니다.</P>
+<P>16. 주당손익(1) 가중평균 유통보통주식수</P>
+<P>(3) 반희석 효과로 기본주당손익과 희석주당손익은 동일합니다.17. 부가가치 관련자료당기와 전기의 자료는 다음과 같습니다.</P>
+</SECTION-2>
+</SECTION-1>
+<SECTION-1><TITLE>외부감사 실시내용</TITLE>
+<SECTION-2><TITLE>1. 감사대상업무</TITLE><P>감사대상업무입니다.</P></SECTION-2>
+<SECTION-2><TITLE>3. 주요 감사실시내용</TITLE><P>주요 감사실시내용입니다.</P></SECTION-2>
+</SECTION-1>
+</BODY>
+</DOCUMENT>

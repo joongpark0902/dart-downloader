@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>테스트주식회사 — 사업보고서</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #f5f5f5; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+       font-size: 13px; color: #1a1a1a; line-height: 1.6; }
+.page { max-width: 960px; margin: 0 auto; background: #fff;
+        padding: 40px 48px; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
+h1 { font-size: 1.6em; font-weight: 700; margin: 24px 0 16px; color: #111; border-bottom: 2px solid #2563eb; padding-bottom: 8px; }
+h2 { font-size: 1.25em; font-weight: 700; margin: 24px 0 10px; color: #1d4ed8; border-left: 4px solid #2563eb; padding-left: 10px; }
+h3 { font-size: 1.1em;  font-weight: 700; margin: 18px 0 8px;  color: #1e40af; }
+h4 { font-size: 1.0em;  font-weight: 700; margin: 14px 0 6px;  color: #374151; }
+h5 { font-size: 0.95em; font-weight: 700; margin: 10px 0 4px;  color: #6b7280; }
+p  { margin: 6px 0; }
+hr.pgbrk { border: none; border-top: 1px dashed #d1d5db; margin: 20px 0; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0 16px; font-size: 12px; }
+th, td { border: 1px solid #d1d5db; padding: 5px 8px; word-break: keep-all; }
+th { background: #eff6ff; font-weight: 700; }
+td.te { background: #fafafa; }
+td.tu { background: #f0f9ff; }
+.tg { margin: 8px 0; }
+.cover { text-align: center; margin-bottom: 32px; }
+.cover h1 { border: none; }
+.section-1 { margin-top: 32px; }
+.section-2 { margin: 16px 0 8px 12px; }
+.section-3 { margin: 10px 0 6px 20px; }
+.note { margin: 10px 0; padding: 8px 12px; background: #fafafa; border-left: 3px solid #e5e7eb; }
+
+/* ── 목차 사이드바 ─────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+.wrap { display: flex; align-items: flex-start; gap: 20px;
+        max-width: 1320px; margin: 0 auto; padding: 20px 16px; }
+.wrap > .page { flex: 1; min-width: 0; margin: 0; padding: 32px 40px; overflow-x: auto; }
+.tg { overflow-x: auto; }
+.toc { position: sticky; top: 20px; width: 268px; flex: none;
+       max-height: calc(100vh - 40px); overflow-y: auto;
+       background: #fff; border: 1px solid #e5e7eb; border-radius: 6px;
+       padding: 14px 8px 16px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.toc .toc-h { font-size: 12px; font-weight: 700; letter-spacing: .08em;
+              color: #6b7280; padding: 0 10px 10px; border-bottom: 1px solid #e5e7eb;
+              margin-bottom: 8px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 4px;
+         color: #374151; text-decoration: none; font-size: 12.5px;
+         line-height: 1.45; word-break: keep-all; border-left: 2px solid transparent; }
+.toc a:hover { background: #eff6ff; color: #1d4ed8; }
+.toc a.lv0 { font-weight: 700; color: #1e3a8a; margin-top: 6px; }
+.toc a.lv1 { padding-left: 22px; }
+.toc a.lv2 { padding-left: 34px; color: #6b7280; font-size: 12px; }
+:target { background: #fef9c3; scroll-margin-top: 16px; }
+
+@media (max-width: 980px) {
+  .wrap { display: block; padding: 12px; }
+  .toc { position: static; width: auto; max-height: 320px; margin-bottom: 16px; }
+  .wrap > .page { padding: 24px 20px; }
+}
+@media print { .toc { display: none; } .wrap { display: block; } }
+</style>
+</head>
+<body>
+<div class="wrap"><nav class="toc"><div class="toc-h">목차</div><a class="lv0" href="#sec1">III. 재무에 관한 사항</a><a class="lv1" href="#sec2">2-1. 연결 재무상태표</a><a class="lv1" href="#sec3">3. 연결재무제표 주석</a><a class="lv1" href="#sec4">1. 지배기업의 개요 (연결)</a><a class="lv1" href="#sec5">2. 중요한 회계처리방침 (연결)</a><a class="lv1" href="#sec6">3. 중요한 회계정책 (연결)</a><a class="lv1" href="#sec7">4. 종속기업의 현황 5. 관계기업및공동기업투자주식 (연결)</a><a class="lv1" href="#sec8">6. 영업부문 (연결)</a><a class="lv1" href="#sec9">7-1. 범주별 금융상품 (연결)</a><a class="lv1" href="#sec10">8. 매출채권 및 기타채권 (연결)</a><a class="lv1" href="#sec11">16. 사채, 차입금 (연결)</a><a class="lv1" href="#sec12">17. 충당부채 (연결)</a><a class="lv1" href="#sec13">28. 우발부채 및 약정사항 (연결)</a><a class="lv1" href="#sec14">4. 재무제표</a><a class="lv1" href="#sec15">5. 재무제표 주석</a><a class="lv1" href="#sec16">1. 회사의 개요</a><a class="lv1" href="#sec17">2. 중요한 회계처리방침</a><a class="lv1" href="#sec18">3. 중요한 회계정책</a><a class="lv1" href="#sec19">15. 사채, 차입금</a><a class="lv1" href="#sec20">99. 없는번호참조</a></nav><div class="page">
+<div class="document">
+
+
+<div class="cover"><h1>사 업 보 고 서</h1></div>
+<div class="body">
+<div class="section-1"><h3 id="sec1">III. 재무에 관한 사항</h3>
+<div class="section-2"><h4 id="sec2">2-1. 연결 재무상태표</h4>
+<div class="tg"><table><tbody>
+<tr><td>재고자산(주석3,4)</td><td>1,000</td></tr>
+<tr><td>매출채권(주석 8 참조)</td><td>2,000</td></tr>
+</tbody></table></div>
+</div>
+<div class="section-2"><h4 id="sec3">3. 연결재무제표 주석</h4></div>
+<div class="section-2"><h4 id="sec4">1. 지배기업의 개요 (연결)</h4><p>지배기업의 개요입니다.</p></div>
+<div class="section-2"><h4 id="sec5">2. 중요한 회계처리방침 (연결)</h4><p>주석 4, 5에서 설명하고 있습니다.</p></div>
+<div class="section-2"><h4 id="sec6">3. 중요한 회계정책 (연결)</h4><p>회계정책입니다.</p></div>
+<div class="section-2"><h4 id="sec7">4. 종속기업의 현황 5. 관계기업및공동기업투자주식 (연결)</h4><p>합쳐진 제목입니다.</p></div>
+<div class="section-2"><h4 id="sec8">6. 영업부문 (연결)</h4><p>영업부문입니다.</p></div>
+<div class="section-2"><h4 id="sec9">7-1. 범주별 금융상품 (연결)</h4><p>범주별 금융상품입니다.</p></div>
+<div class="section-2"><h4 id="sec10">8. 매출채권 및 기타채권 (연결)</h4><p>매출채권입니다.</p></div>
+<div class="section-2"><h4 id="sec11">16. 사채, 차입금 (연결)</h4><p>(1) 차입금 내역<span style="font-weight:bold">굵게</span></p></div>
+<div class="section-2"><h4 id="sec12">17. 충당부채 (연결)</h4><p>추정의 주요 가정- 주석 17 및 28: 충당부채와 우발부채</p></div>
+<div class="section-2"><h4 id="sec13">28. 우발부채 및 약정사항 (연결)</h4><p>재무제표 주석의 2. 재무제표 작성기준을 참고하십시오.</p></div>
+<div class="section-2"><h4 id="sec14">4. 재무제표</h4>
+<div class="tg"><table><tbody>
+<tr><td>재고자산(주석3,4)</td><td>900</td></tr>
+</tbody></table></div>
+</div>
+<div class="section-2"><h4 id="sec15">5. 재무제표 주석</h4></div>
+<div class="section-2"><h4 id="sec16">1. 회사의 개요</h4><p>회사의 개요입니다.</p></div>
+<div class="section-2"><h4 id="sec17">2. 중요한 회계처리방침</h4><p>(11) 자산손상은 별도 항목이 아닙니다.</p></div>
+<div class="section-2"><h4 id="sec18">3. 중요한 회계정책</h4><p>1) 리스제공자도 항목이 아닙니다.</p></div>
+<div class="section-2"><h4 id="sec19">15. 사채, 차입금</h4><p>분류되어 있습니다(주석 15 참조).</p></div>
+<div class="section-2"><h4 id="sec20">99. 없는번호참조</h4><p>없는 번호입니다(주석 77 참조).</p></div>
+</div>
+</div>
+</div>
+</div></div>
+</body>
+</html>
