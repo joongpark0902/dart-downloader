@@ -1,12 +1,13 @@
 """분석 탭: 재무지표.
 
-dart_gui.py의 _render_ratio 를 그대로 옮긴 모듈이다. 이 탭은 별도의 API 호출이
-없다 — 핵심재무(fin.py) 탭이 조회해 둔 원본 데이터로 비율을 계산한다.
-위젯 접근은 self._ratio_content → ctx.content, self._ratio_title → ctx.title_label 로 바꿨다.
+dart_gui.py의 _render_ratio 를 그대로 옮긴 모듈이다. 이 탭은 독립된 API 호출이나
+계산을 갖지 않는다 — 핵심재무(analysis/fin.py)의 load() 가 데이터를 조회하고
+calculate_financial_ratios 로 비율까지 계산한 뒤, 이 모듈의 render() 를 직접
+호출해 화면을 갱신한다. 위젯 접근은 self._ratio_content → ctx.content,
+self._ratio_title → ctx.title_label 로 바꿨다.
 """
 import customtkinter as ctk
 
-from financials import calculate_financial_ratios
 from ui_theme import fmt_ratio_val
 
 TITLE = "재무지표"
@@ -94,16 +95,14 @@ def render(ctx, state, data=None, years=None):
 
 
 def load(app, ctx):
-    """핵심재무 탭이 받아 둔 데이터로 계산한다. 아직 없으면 대기 상태로 둔다.
+    """재무지표 탭은 독립된 로더를 갖지 않는다 — 아무 것도 하지 않는다.
 
-    브리프가 제시한 예시(render(ctx, "done", calculate_financial_ratios(app.fin_data)))는
-    연도 헤더에 쓰이는 years 인자가 빠져 있어 _render_ratio 의 실제 시그니처와
-    맞지 않는다. calculate_financial_ratios 의 반환 행마다 "year" 키가 있으므로
-    여기서 years 를 뽑아 함께 넘긴다.
+    dart_gui.py 원본에서 재무지표(_render_ratio)는 핵심재무의 _load_financials
+    가 조회한 데이터로부터 계산되어 함께 렌더링될 뿐, 자신만의 조회/계산 로직이
+    없다. 이 탭의 실제 갱신은 analysis/fin.py 의 load() 가
+    app.ctx_of(ratio) 를 통해 render() 를 직접 호출하며 이뤄진다.
+
+    그럼에도 load(app, ctx) 를 정의해 두는 이유는, 분석 패널이 모든 탭 모듈의
+    load 를 동일한 방식으로 호출할 수 있게 하기 위해서다(균일 인터페이스).
     """
-    if app.fin_data is None:
-        render(ctx, "initial")
-        return
-    ratios = calculate_financial_ratios(app.fin_data)
-    years = [r["year"] for r in ratios]
-    render(ctx, "done", data=ratios, years=years)
+    pass

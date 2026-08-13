@@ -3,13 +3,25 @@
 dart_gui.py의 _render_fin / _load_financials 를 그대로 옮긴 모듈이다.
 위젯 접근은 self._fin_content → ctx.content, self._fin_title → ctx.title_label 로,
 엔진 호출 인자는 app.download_panel.* / app.selected_corp 로 바꿨다.
+
+_load_financials 는 원본에서 핵심재무·재무지표 두 탭을 함께 구동하는 단일 로더다.
+재무지표(analysis/ratio.py)는 독립된 API 호출이나 계산을 갖지 않으므로, 이 모듈의
+load() 가 두 탭 모두를 갱신한다.
 """
 import threading
 
 import customtkinter as ctk
 
-from financials import get_key_financials_3y
+from financials import (
+    calculate_financial_ratios,
+    get_extended_financials_3y,
+    get_key_financials_3y,
+)
 from ui_theme import fmt_val
+
+# 재무지표 탭 컨텍스트를 얻기 위해 모듈 자체를 import 한다.
+# app.ctx_of(module) 접근자는 다음 작업(Task 10)에서 도입된다.
+from analysis import ratio
 
 TITLE = "핵심재무"
 SCOPE = "3y_fs"
@@ -130,9 +142,8 @@ def render(ctx, state, data=None, corp_name="", years=None):
 def load(app, ctx):
     """엔진을 스레드에서 불러 결과로 render 를 부른다.
 
-    확장재무(매출총이익 등)는 재무지표 탭이 자체적으로 계산하도록 분리했으므로
-    (analysis/ratio.py 참고), 여기서는 핵심재무만 조회하고 원본 데이터를
-    app.fin_data 에 남겨 둔다. 재무지표 탭 갱신 트리거는 Task 10에서 배선한다.
+    dart_gui.py 의 _load_financials 를 그대로 이식했다 — 핵심재무 탭(ctx)과
+    재무지표 탭(app.ctx_of(ratio))을 함께 갱신하는 단일 로더다.
     """
     corp     = app.selected_corp
     api_key  = app.download_panel.api_key_var.get().strip()
@@ -140,7 +151,10 @@ def load(app, ctx):
     # TODO(Task10): fs_seg(연결/별도 토글)는 분석 패널로 옮겨질 예정. 지금은 app.fs_seg 로 읽는다.
     fs_div   = "CFS" if app.fs_seg.get() == "연결" else "OFS"
 
+    ratio_ctx = app.ctx_of(ratio)  # ctx_of 는 Task 10에서 도입 예정
+
     app.after(0, lambda: render(ctx, "loading"))
+    app.after(0, lambda: ratio.render(ratio_ctx, "loading"))
 
     def run():
         try:
@@ -151,14 +165,24 @@ def load(app, ctx):
             # OFS 데이터가 전 연도 없으면 안내
             if fs_div == "OFS" and all(not r.get("available") for r in data):
                 app.after(0, lambda: render(ctx, "no_ofs"))
+                app.after(0, lambda: ratio.render(ratio_ctx, "no_ofs"))
                 return
             years = [r["year"] for r in data]
-            app.fin_data = data
+            try:
+                ext = get_extended_financials_3y(
+                    api_key, corp["corp_code"], end_year, log_fn=app.download_panel.log
+                )
+            except Exception as e:
+                app.download_panel.log(f"확장재무 조회 실패 (무시): {e}")
+                ext = None
+            ratios = calculate_financial_ratios(data, extended_3y=ext)
             app.after(0, lambda: render(ctx, "done", data=data,
                                          corp_name=corp["corp_name"],
                                          years=years))
+            app.after(0, lambda: ratio.render(ratio_ctx, "done", data=ratios, years=years))
         except Exception as e:
             app.download_panel.log(f"재무 데이터 오류: {e}")
             app.after(0, lambda: render(ctx, "error"))
+            app.after(0, lambda: ratio.render(ratio_ctx, "error"))
 
     threading.Thread(target=run, daemon=True).start()
