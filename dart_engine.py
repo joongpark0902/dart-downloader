@@ -14,6 +14,12 @@ _DIVIDEND_URL   = "https://opendart.fss.or.kr/api/alotMatter.json"
 
 _VALID_ENTITY = re.compile(r"&(?:\#\d+|\#x[\da-fA-F]+|amp|lt|gt|quot|apos);")
 _TAG_START    = re.compile(r"</?[A-Za-z_!][\w:.-]*")
+_ANY_TAG      = re.compile(r"<(/?)([A-Za-z_][\w:.-]*)[^<>]*?(/?)>")
+
+# DART가 줄바꿈용으로 쓰는 비표준 엔티티. 표준 XML 파서는 모르므로
+# 보정 단계에서 줄바꿈 표식(U+2028)으로 바꿔두고, HTML 변환 때 <br>로 편다.
+_DART_BR_ENTITY = "&cr;"
+_BR_SENTINEL    = " "
 
 
 # ── 1. 회사 목록 로드 ─────────────────────────────────────────────────────────
@@ -41,7 +47,8 @@ def load_corp_list(api_key, cache_path="CORPCODE.xml", log_fn=None):
     tree = ET.parse(cache_path)
     corps = [
         {"corp_code": item.findtext("corp_code", ""),
-         "corp_name": item.findtext("corp_name", "")}
+         "corp_name": item.findtext("corp_name", ""),
+         "stock_code": (item.findtext("stock_code", "") or "").strip()}
         for item in tree.getroot().findall("list")
     ]
     log(f"회사 목록 로드 완료: {len(corps):,}건")
@@ -86,12 +93,56 @@ def search_company(corp_list, keyword):
 
 
 # ── 3. 공시 목록 조회 ─────────────────────────────────────────────────────────
+# 보고서 유형 → DART 공시유형(pblntf_ty) 매핑
+#   A = 정기공시(사업·반기·분기보고서)
+#   F = 외부감사관련(감사보고서·연결감사보고서 단독공시)
+#       └ 비상장 외부감사대상 법인은 사업보고서를 내지 않고 이쪽만 제출한다.
+_PERIODIC_TYPES = ("사업보고서", "반기보고서", "분기보고서")
+AUDIT_TYPE      = "감사보고서"     # 부분일치라 '연결감사보고서'도 함께 잡힌다
+
+
+def _fetch_disclosure_pages(api_key, corp_code, bgn_de, end_de, pblntf_ty, log):
+    """
+    한 공시유형(pblntf_ty)의 목록을 전체 페이지 모아 반환한다.
+    조회 결과가 없으면(status 013) 빈 리스트 — 오류가 아니다.
+    """
+    items   = []
+    page_no = 1
+    while True:
+        resp = requests.get(_LIST_URL, params={
+            "crtfc_key": api_key,
+            "corp_code": corp_code,
+            "bgn_de": bgn_de,
+            "end_de": end_de,
+            "pblntf_ty": pblntf_ty,
+            "page_no": page_no,
+            "page_count": 100,
+        })
+        data   = resp.json()
+        status = data.get("status")
+
+        if status == "013":          # 조회된 데이터 없음
+            break
+        if status != "000":
+            raise RuntimeError(f"list.json 오류: {status} {data.get('message')}")
+
+        items.extend(data.get("list", []))
+        total_page = int(data.get("total_page") or 1)
+        if page_no >= total_page:
+            break
+        page_no += 1
+
+    return items
+
+
 def list_disclosures(api_key, corp_code, bgn_de, end_de,
                      report_types=None, log_fn=None):
     """
-    정기공시(pblntf_ty=A) 목록을 조회해 반환한다.
-    report_types: ["사업보고서", "반기보고서", "분기보고서"] 같은 리스트.
-                  None이면 필터 없이 전체 반환.
+    정기공시(A)와 감사보고서 단독공시(F) 목록을 조회해 반환한다.
+    report_types: ["사업보고서", "반기보고서", "분기보고서", "감사보고서"] 중 원하는 것.
+                  None이면 정기공시 3종을 조회한다.
+                  "감사보고서"가 들어 있으면 pblntf_ty=F 도 함께 조회하므로
+                  사업보고서를 내지 않는 비상장 외감법인도 받을 수 있다.
     정정본("정정"이 report_nm에 포함)은 항상 제외한다.
     반환값: [{"rcept_no": "...", "report_nm": "...", "rcept_dt": "..."}, ...]
     """
@@ -99,37 +150,43 @@ def list_disclosures(api_key, corp_code, bgn_de, end_de,
         if log_fn:
             log_fn(msg)
 
-    params = {
-        "crtfc_key": api_key,
-        "corp_code": corp_code,
-        "bgn_de": bgn_de,
-        "end_de": end_de,
-        "pblntf_ty": "A",
-        "page_count": 100,
-    }
-    resp = requests.get(_LIST_URL, params=params)
-    data = resp.json()
+    wanted   = list(report_types) if report_types else list(_PERIODIC_TYPES)
+    periodic = [rt for rt in wanted if rt in _PERIODIC_TYPES]
+    audit    = [rt for rt in wanted if rt not in _PERIODIC_TYPES]
 
-    if data.get("status") != "000":
-        raise RuntimeError(f"list.json 오류: {data.get('status')} {data.get('message')}")
+    raw = []
+    if periodic:
+        got = _fetch_disclosure_pages(api_key, corp_code, bgn_de, end_de, "A", log)
+        log(f"정기공시 수신: {len(got)}건")
+        raw += got
+    if audit:
+        got = _fetch_disclosure_pages(api_key, corp_code, bgn_de, end_de, "F", log)
+        log(f"외부감사관련 공시 수신: {len(got)}건")
+        raw += got
 
-    items = data.get("list", [])
-    log(f"공시 목록 수신: {len(items)}건 (전체 {data.get('total_count')}건)")
+    # rcept_no 중복 제거 (A·F 양쪽에 걸리는 공시 대비)
+    seen, items = set(), []
+    for i in raw:
+        if i["rcept_no"] not in seen:
+            seen.add(i["rcept_no"])
+            items.append(i)
 
     # 정정본 제외
     items = [i for i in items if "정정" not in i["report_nm"]]
 
     # 보고서 유형 필터
-    if report_types:
-        items = [
-            i for i in items
-            if any(rt in i["report_nm"] for rt in report_types)
-        ]
+    items = [i for i in items if any(rt in i["report_nm"] for rt in wanted)]
+    items.sort(key=lambda i: i["rcept_dt"])
 
     log(f"필터 후: {len(items)}건")
     if len(items) == 0:
-        log("이 회사는 정기공시(사업/반기/분기보고서) 제출 이력이 없습니다. "
-            "비상장 외감법인은 감사보고서만 제출하는 경우가 많습니다.")
+        if audit:
+            log("해당 기간에 받을 공시가 없습니다. "
+                "연도 범위를 넓혀 보세요(감사보고서는 결산 다음 해 3~4월에 공시됩니다).")
+        else:
+            log("정기공시(사업/반기/분기보고서) 제출 이력이 없습니다. "
+                "비상장 외감법인은 감사보고서만 제출하므로 "
+                "'감사보고서'를 체크하고 다시 시도하세요.")
     return [
         {"rcept_no": i["rcept_no"],
          "report_nm": i["report_nm"],
@@ -139,21 +196,133 @@ def list_disclosures(api_key, corp_code, bgn_de, end_de,
 
 
 # ── 4. 문서 다운로드 ──────────────────────────────────────────────────────────
-def download_document(api_key, rcept_no, save_dir, log_fn=None):
+_ILLEGAL_FS_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]+')
+_DOC_NAME_TAG     = re.compile(r"<DOCUMENT-NAME[^>]*>(.*?)</DOCUMENT-NAME>",
+                               re.IGNORECASE | re.DOTALL)
+
+
+def safe_filename(name, fallback="문서"):
+    """윈도우 파일명으로 쓸 수 없는 문자를 걷어내고 길이를 자른다."""
+    cleaned = _ILLEGAL_FS_CHARS.sub(" ", name or "")
+    cleaned = " ".join(cleaned.split()).strip(" .")
+    return cleaned[:80] or fallback
+
+
+def _read_document_name(path):
+    """
+    공시 원문 첫머리의 <DOCUMENT-NAME>을 읽어 문서 제목을 돌려준다.
+    (첨부문서 파일명에 쓴다. 전체를 파싱하지 않고 앞부분만 훑는다)
+    """
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            head = f.read(65536)
+    except OSError:
+        return ""
+    m = _DOC_NAME_TAG.search(head)
+    if not m:
+        return ""
+    # 제목 안의 태그·엔티티 제거
+    text = re.sub(r"<[^>]*>", "", m.group(1))
+    text = text.replace(_DART_BR_ENTITY, " ")
+    return " ".join(text.split())
+
+
+def _rename_extracted(save_dir, rcept_no, extracted, base_name, log):
+    """
+    접수번호 파일명({rcept_no}.xml)을 알아보기 쉬운 이름으로 바꾼다.
+      본문     → {base_name}.xml            예: 사업보고서_2024.xml
+      첨부문서 → {base_name}_{문서제목}.xml  예: 사업보고서_2024_감사보고서.xml
+    반환값: 최종 파일명 리스트
+    """
+    # 본문 파일은 '{rcept_no}.확장자', 첨부는 '{rcept_no}_00760.xml' 형태다.
+    # 접수번호로 딱 떨어지는 게 없으면 이름이 가장 짧은 것을 본문으로 본다.
+    def is_main(f):
+        return os.path.splitext(f)[0] == rcept_no
+
+    main_first = sorted(extracted, key=lambda f: (not is_main(f), len(f), f))
+    final, used = [], set()
+
+    for idx, fname in enumerate(main_first):
+        src = os.path.join(save_dir, fname)
+        if not os.path.exists(src):
+            continue
+        ext = os.path.splitext(fname)[1] or ".xml"
+
+        if idx == 0:
+            stem = base_name
+        else:
+            doc_name = safe_filename(_read_document_name(src), fallback=f"첨부{idx}")
+            stem = f"{base_name}_{doc_name}"
+
+        candidate = f"{stem}{ext}"
+        seq = 2
+        while candidate.lower() in used or (
+            os.path.exists(os.path.join(save_dir, candidate)) and candidate != fname
+        ):
+            candidate = f"{stem}_{seq}{ext}"
+            seq += 1
+        used.add(candidate.lower())
+
+        if candidate != fname:
+            try:
+                os.replace(src, os.path.join(save_dir, candidate))
+            except OSError as e:
+                log(f"파일명 변경 실패 ({fname}): {e}")
+                candidate = fname
+        final.append(candidate)
+
+    return final
+
+
+def download_document(api_key, rcept_no, save_dir, log_fn=None, base_name=None):
     """
     rcept_no에 해당하는 공시 문서를 save_dir에 다운로드·압축해제한다.
-    이미 .done 마커가 있으면 건너뛴다.
+    base_name을 주면 '사업보고서_2024.xml'처럼 알아보기 쉬운 이름으로 저장한다.
+
+    이미 .done_{rcept_no} 마커가 있으면 건너뛴다. 마커를 접수번호별로 두므로
+    같은 폴더에 여러 공시가 들어가도(1·3분기 보고서, 별도·연결 감사보고서 등)
+    서로를 건너뛰지 않는다. 마커 파일에는 그 공시가 만든 파일 목록이 들어간다.
     반환값: {"status": "성공"|"건너뜀"|"실패", "files": [...]}
     """
     def log(msg):
         if log_fn:
             log_fn(msg)
 
-    done_marker = os.path.join(save_dir, ".done")
+    done_marker   = os.path.join(save_dir, f".done_{rcept_no}")
+    legacy_marker = os.path.join(save_dir, ".done")   # 구버전(폴더당 1개) 마커
+
+    def existing_files():
+        """마커에 적힌 파일 중 실제로 남아 있는 것들."""
+        try:
+            with open(done_marker, encoding="utf-8") as f:
+                listed = [ln.strip() for ln in f if ln.strip()]
+        except OSError:
+            listed = []
+        found = [f for f in listed if os.path.exists(os.path.join(save_dir, f))]
+        if found:
+            return found
+        # 마커가 비었거나(구버전) 이름이 바뀐 경우 접수번호로 되짚는다
+        if not os.path.isdir(save_dir):
+            return []
+        return [f for f in os.listdir(save_dir)
+                if f.startswith(rcept_no) and not f.startswith(".done")]
+
+    def write_marker(files):
+        with open(done_marker, "w", encoding="utf-8") as f:
+            f.write("\n".join(files))
+
     if os.path.exists(done_marker):
-        files = [f for f in os.listdir(save_dir) if f != ".done"]
         log(f"[건너뜀] {rcept_no} (이미 존재)")
-        return {"status": "건너뜀", "files": files}
+        return {"status": "건너뜀", "files": existing_files()}
+
+    # 구버전으로 받아둔 폴더: 이 접수번호 파일이 실제로 있으면 완료로 인정하고 마커만 갱신
+    if os.path.exists(legacy_marker):
+        old = [f for f in os.listdir(save_dir)
+               if f.startswith(rcept_no) and not f.startswith(".done")]
+        if old:
+            write_marker(old)
+            log(f"[건너뜀] {rcept_no} (이미 존재)")
+            return {"status": "건너뜀", "files": old}
 
     os.makedirs(save_dir, exist_ok=True)
 
@@ -172,7 +341,12 @@ def download_document(api_key, rcept_no, save_dir, log_fn=None):
         z.extractall(save_dir)
 
     os.remove(zip_path)
-    open(done_marker, "w").close()
+
+    if base_name:
+        extracted = _rename_extracted(save_dir, rcept_no, extracted,
+                                      safe_filename(base_name), log)
+
+    write_marker(extracted)
     log(f"[성공] {rcept_no} → {len(extracted)}개 파일")
     return {"status": "성공", "files": extracted}
 
@@ -838,6 +1012,11 @@ def get_capital_changes_3y(api_key, corp_code, end_year, reprt_code="11011", log
 # ── 9. XML → HTML 변환 ───────────────────────────────────────────────────────
 import html as _html_mod
 
+
+def _esc(text):
+    """본문 텍스트 이스케이프. fix_xml이 남긴 줄바꿈 표식은 <br>로 편다."""
+    return _html_mod.escape(text).replace(_BR_SENTINEL, "<br>")
+
 _DART_CSS = """
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: #f5f5f5; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
@@ -863,7 +1042,39 @@ td.tu { background: #f0f9ff; }
 .section-2 { margin: 16px 0 8px 12px; }
 .section-3 { margin: 10px 0 6px 20px; }
 .note { margin: 10px 0; padding: 8px 12px; background: #fafafa; border-left: 3px solid #e5e7eb; }
+
+/* ── 목차 사이드바 ─────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+.wrap { display: flex; align-items: flex-start; gap: 20px;
+        max-width: 1320px; margin: 0 auto; padding: 20px 16px; }
+.wrap > .page { flex: 1; min-width: 0; margin: 0; padding: 32px 40px; overflow-x: auto; }
+.tg { overflow-x: auto; }
+.toc { position: sticky; top: 20px; width: 268px; flex: none;
+       max-height: calc(100vh - 40px); overflow-y: auto;
+       background: #fff; border: 1px solid #e5e7eb; border-radius: 6px;
+       padding: 14px 8px 16px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.toc .toc-h { font-size: 12px; font-weight: 700; letter-spacing: .08em;
+              color: #6b7280; padding: 0 10px 10px; border-bottom: 1px solid #e5e7eb;
+              margin-bottom: 8px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 4px;
+         color: #374151; text-decoration: none; font-size: 12.5px;
+         line-height: 1.45; word-break: keep-all; border-left: 2px solid transparent; }
+.toc a:hover { background: #eff6ff; color: #1d4ed8; }
+.toc a.lv0 { font-weight: 700; color: #1e3a8a; margin-top: 6px; }
+.toc a.lv1 { padding-left: 22px; }
+.toc a.lv2 { padding-left: 34px; color: #6b7280; font-size: 12px; }
+:target { background: #fef9c3; scroll-margin-top: 16px; }
+
+@media (max-width: 980px) {
+  .wrap { display: block; padding: 12px; }
+  .toc { position: static; width: auto; max-height: 320px; margin-bottom: 16px; }
+  .wrap > .page { padding: 24px 20px; }
+}
+@media print { .toc { display: none; } .wrap { display: block; } }
 """
+
+# 목차에 넣을 제목 깊이 상한 (h2·h3·h4 까지. h5 소제목은 너무 잘게 쪼개져 제외)
+_TOC_MAX_LEVEL = 4
 
 # DART 태그 → HTML 태그 (단순 컨테이너)
 _DART_DIV = {"COVER", "BODY", "NOTE", "DOCUMENT"}
@@ -901,11 +1112,23 @@ def _dart_span_style(usermark):
     return ";".join(styles)
 
 
-def _dart_elem_to_html(elem, sec_depth=1):
-    """DART XML Element를 HTML 문자열로 재귀 변환."""
+def _toc_entry(toc, elem, level):
+    """제목 elem을 목차에 등록하고 앵커 id를 돌려준다. toc가 None이면 앵커 없음."""
+    if toc is None:
+        return ""
+    text = " ".join("".join(elem.itertext()).split())
+    if not text:
+        return ""
+    anchor = f"sec{len(toc) + 1}"
+    toc.append({"id": anchor, "level": level, "text": text})
+    return anchor
+
+
+def _dart_elem_to_html(elem, sec_depth=1, toc=None):
+    """DART XML Element를 HTML 문자열로 재귀 변환. toc를 주면 제목에 앵커를 단다."""
     tag = elem.tag
-    txt  = _html_mod.escape(elem.text  or "")
-    tail = _html_mod.escape(elem.tail  or "")
+    txt  = _esc(elem.text or "")
+    tail = _esc(elem.tail or "")
 
     if tag in _DART_SKIP:
         return tail  # 자식 무시, tail만 유지
@@ -913,16 +1136,20 @@ def _dart_elem_to_html(elem, sec_depth=1):
     # ── 섹션: 자식에게 새 깊이를 전달해야 하므로 먼저 처리
     if tag in _DART_SEC:
         new_depth = _DART_SEC[tag]
-        inner = "".join(_dart_elem_to_html(c, new_depth) for c in elem)
+        inner = "".join(_dart_elem_to_html(c, new_depth, toc) for c in elem)
         return f'<div class="{tag.lower()}">{txt}{inner}</div>{tail}'
 
-    # 이하 공통 kids (현재 sec_depth 유지)
-    kids = "".join(_dart_elem_to_html(c, sec_depth) for c in elem)
-
-    # ── TITLE → hN (부모 섹션 깊이 기반)
+    # ── TITLE → hN (부모 섹션 깊이 기반). 목차 등록은 자식 변환 전에 해야
+    #    문서 순서대로 번호가 매겨진다.
     if tag == "TITLE":
-        h = f"h{min(sec_depth + 1, 5)}"
-        return f"<{h}>{txt}{kids}</{h}>{tail}"
+        level  = min(sec_depth + 1, 5)
+        anchor = _toc_entry(toc, elem, level)
+        kids   = "".join(_dart_elem_to_html(c, sec_depth, toc) for c in elem)
+        ia     = f' id="{anchor}"' if anchor else ""
+        return f"<h{level}{ia}>{txt}{kids}</h{level}>{tail}"
+
+    # 이하 공통 kids (현재 sec_depth 유지)
+    kids = "".join(_dart_elem_to_html(c, sec_depth, toc) for c in elem)
 
     # ── COVER-TITLE
     if tag == "COVER-TITLE":
@@ -993,6 +1220,28 @@ def _dart_elem_to_html(elem, sec_depth=1):
     return f"{txt}{kids}{tail}"
 
 
+def _build_toc_html(toc):
+    """
+    수집한 제목 목록을 목차 사이드바 HTML로 만든다.
+    항목이 2개 미만이면 빈 문자열 — 목차를 붙일 이유가 없다.
+    """
+    # 원문에 이미 들어 있는 '목 차' 장은 사이드바와 겹치므로 뺀다
+    items = [t for t in toc
+             if t["level"] <= _TOC_MAX_LEVEL and t["text"].replace(" ", "") != "목차"]
+    if len(items) < 2:
+        return ""
+
+    base = min(t["level"] for t in items)
+    links = []
+    for t in items:
+        cls  = f"lv{min(t['level'] - base, 2)}"
+        text = _html_mod.escape(t["text"])
+        links.append(f'<a class="{cls}" href="#{t["id"]}">{text}</a>')
+
+    return ('<nav class="toc"><div class="toc-h">목차</div>'
+            + "".join(links) + "</nav>")
+
+
 def convert_to_html(xml_path, output_path, log_fn=None):
     """
     DART XML 파일을 읽기용 HTML 파일로 변환한다.
@@ -1018,7 +1267,14 @@ def convert_to_html(xml_path, output_path, log_fn=None):
     corp_name = (root.findtext("COMPANY-NAME")  or "").strip()
     title_str = _html_mod.escape(f"{corp_name} — {doc_name}" if corp_name else doc_name)
 
-    body_html = _dart_elem_to_html(root)
+    toc = []
+    body_html = _dart_elem_to_html(root, toc=toc)
+
+    toc_html = _build_toc_html(toc)
+    if toc_html:
+        content = f'<div class="wrap">{toc_html}<div class="page">\n{body_html}\n</div></div>'
+    else:
+        content = f'<div class="page">\n{body_html}\n</div>'
 
     html_out = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -1029,9 +1285,7 @@ def convert_to_html(xml_path, output_path, log_fn=None):
 <style>{_DART_CSS}</style>
 </head>
 <body>
-<div class="page">
-{body_html}
-</div>
+{content}
 </body>
 </html>"""
 
@@ -1043,16 +1297,40 @@ def convert_to_html(xml_path, output_path, log_fn=None):
 
 
 # ── 10. XML 보정 ──────────────────────────────────────────────────────────────
+def _scan_real_tags(xml_text):
+    """
+    문서 전체를 훑어 '진짜 태그로 쓰인 이름'을 모은다.
+
+    DART 원문 본문에는 <HL036>, <WORLDWIDE> 처럼 꺾쇠로 감싼 제품명·약어가
+    그대로 들어 있다. 생김새가 태그와 똑같아 파서가 열린 태그로 오인하고
+    'mismatched tag'로 죽는다. 닫는 태그(</X>)나 자기완결 태그(<X/>)로
+    한 번이라도 등장한 이름만 실제 태그로 인정하면 이 둘을 갈라낼 수 있다.
+    반환값: (닫는 태그로 등장한 이름 set, 자기완결로만 등장한 이름 set)
+    """
+    closing, selfclosing = set(), set()
+    for slash, name, sc in _ANY_TAG.findall(xml_text):
+        if slash:
+            closing.add(name.upper())
+        elif sc:
+            selfclosing.add(name.upper())
+    return closing, selfclosing - closing
+
+
 def fix_xml(xml_text):
     """
-    DART XML에서 발생하는 두 가지 오염을 보정한다:
+    DART XML에서 발생하는 오염을 보정한다:
       - 텍스트/속성값 내 날것 & → &amp;
       - 텍스트 내 비태그 < → &lt;
+      - 본문에 쓰인 <HL036> 같은 꺾쇠 표기 → 텍스트로 이스케이프
+      - 비표준 엔티티 &cr; → 줄바꿈 표식
     유효한 entity 및 정상 태그는 그대로 유지한다.
     """
+    closing_tags, self_closing_tags = _scan_real_tags(xml_text)
+
     result = []
     i = 0
     n = len(xml_text)
+    br_len = len(_DART_BR_ENTITY)
 
     while i < n:
         c = xml_text[i]
@@ -1078,13 +1356,27 @@ def fix_xml(xml_text):
                     continue
             m = _TAG_START.match(xml_text, i)
             if m:
-                i, tag_str = _parse_tag(xml_text, i, n)
-                result.append(tag_str)
-                continue
+                name = m.group().lstrip("</").upper()
+                if name.startswith("!") or name in closing_tags:
+                    i, tag_str = _parse_tag(xml_text, i, n)
+                    result.append(tag_str)
+                    continue
+                if name in self_closing_tags:
+                    # <BR> 처럼 다른 곳에선 <BR/>로 닫히는 태그 → 자기완결로 맞춰준다
+                    i, tag_str = _parse_tag(xml_text, i, n)
+                    if not tag_str.endswith("/>"):
+                        tag_str = tag_str[:-1] + "/>"
+                    result.append(tag_str)
+                    continue
+                # 닫히는 법이 없는 이름 = 본문에 쓰인 꺾쇠 표기. 텍스트로 넘긴다.
             result.append("&lt;")
             i += 1
 
         elif c == "&":
+            if xml_text[i:i + br_len].lower() == _DART_BR_ENTITY:
+                result.append(_BR_SENTINEL)
+                i += br_len
+                continue
             m = _VALID_ENTITY.match(xml_text, i)
             if m:
                 result.append(m.group())

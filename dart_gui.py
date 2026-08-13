@@ -1,4 +1,6 @@
 import os
+import re
+import sys
 import threading
 import tkinter as tk
 from datetime import datetime
@@ -24,11 +26,46 @@ from dart_engine import (
     search_company,
 )
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+# exe로 묶으면 __file__ 은 임시 해제 폴더(_MEIxxxx)를 가리키므로
+# 저장 폴더·CORPCODE 캐시는 실행파일이 놓인 폴더 기준으로 잡는다.
+if getattr(sys, "frozen", False):
+    _APP_DIR = os.path.dirname(sys.executable)
+else:
+    _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
-_DEFAULT_DOWNLOADS = os.path.join(_HERE, "downloads")
+_DEFAULT_DOWNLOADS = os.path.join(_APP_DIR, "downloads")
+_CORPCODE_PATH     = os.path.join(_APP_DIR, "CORPCODE.xml")
+_CONFIG_PATH       = os.path.join(_APP_DIR, "config.txt")
+
+_CONFIG_HEADER = (
+    "# DART OpenAPI 인증키 (https://opendart.fss.or.kr 에서 발급)\n"
+    "# 이 파일에는 본인 인증키가 들어 있습니다. 공유하거나 git에 올리지 마세요.\n"
+)
+
+
+def load_api_key():
+    """config.txt에서 인증키를 읽는다. 없으면 빈 문자열."""
+    try:
+        with open(_CONFIG_PATH, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("#") or "=" not in line:
+                    continue
+                name, _, value = line.partition("=")
+                if name.strip().lower() == "api_key":
+                    return value.strip()
+    except OSError:
+        pass
+    return ""
+
+
+def save_api_key(key):
+    """인증키를 실행파일 옆 config.txt에 저장한다."""
+    with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
+        f.write(f"{_CONFIG_HEADER}api_key = {key}\n")
+    return _CONFIG_PATH
 
 _FIN_LABELS    = ["매출액", "영업이익", "당기순이익", "자산총계", "부채총계", "자본총계"]
 _DIV_LABELS    = ["주당배당금(원)", "배당성향(%)", "시가배당률(%)", "현금배당총액(백만원)"]
@@ -65,6 +102,47 @@ def _fmt_div_val(val, key):
     if "백만원" in key:
         return _fmt_val(int(val) * 1_000_000)   # 백만원→원 변환 후 조/억 표시
     return f"{int(val):,}원", "white"
+
+
+def _report_year(report_nm):
+    """
+    report_nm 끝의 결산기 표기에서 사업연도를 뽑는다.
+    '사업보고서 (2024.12)' → '2024',  '연결감사보고서 (2025.12)' → '2025'
+    """
+    if "(" in report_nm:
+        tail = report_nm.split("(")[-1][:4]
+        if tail.isdigit():
+            return tail
+    return "unknown"
+
+
+def _report_folder(report_nm, report_types):
+    """
+    저장 폴더에 쓸 보고서 유형명. 연결감사보고서는 별도 폴더로 분리해
+    같은 해 별도·연결 감사보고서가 한 폴더에 섞이지 않게 한다.
+    """
+    if "연결감사보고서" in report_nm:
+        return "연결감사보고서"
+    return next((rt for rt in report_types if rt in report_nm), "기타")
+
+
+_QUARTER_BY_MONTH = {"03": "1분기", "06": "2분기", "09": "3분기", "12": "4분기"}
+
+
+def _report_basename(report_nm, rtype, year):
+    """
+    저장 파일명의 앞부분. 기본은 '보고서유형_연도'.
+    분기보고서만 한 해에 두 번(1·3분기) 나오므로 분기를 덧붙여 구분한다.
+      '분기보고서 (2025.03)' → '분기보고서_2025_1분기'
+    """
+    base = f"{rtype}_{year}"
+    if rtype != "분기보고서":
+        return base
+    m = re.search(r"\((\d{4})\.(\d{2})", report_nm)
+    if not m:
+        return base
+    month = m.group(2)
+    return f"{base}_{_QUARTER_BY_MONTH.get(month, month + '월')}"
 
 
 def _fmt_ratio_val(val):
@@ -121,20 +199,23 @@ class DartApp(ctk.CTk):
         f = ctk.CTkFrame(parent)
         f.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
         f.grid_columnconfigure(1, weight=1)
-        f.grid_columnconfigure(3, weight=2)
+        f.grid_columnconfigure(4, weight=2)
 
         ctk.CTkLabel(f, text="인증키").grid(row=0, column=0, padx=(10, 6), pady=8, sticky="w")
-        self.api_key_var = tk.StringVar(value="")
+        self.api_key_var = tk.StringVar(value=load_api_key())
         ctk.CTkEntry(f, textvariable=self.api_key_var, placeholder_text="DART Open API 인증키 입력").grid(
             row=0, column=1, padx=4, pady=8, sticky="ew"
         )
-        ctk.CTkLabel(f, text="저장폴더").grid(row=0, column=2, padx=(12, 6), pady=8, sticky="w")
+        ctk.CTkButton(f, text="저장", width=56, command=self._save_key).grid(
+            row=0, column=2, padx=(4, 0), pady=8
+        )
+        ctk.CTkLabel(f, text="저장폴더").grid(row=0, column=3, padx=(12, 6), pady=8, sticky="w")
         self.save_dir_var = tk.StringVar(value=_DEFAULT_DOWNLOADS)
         ctk.CTkEntry(f, textvariable=self.save_dir_var).grid(
-            row=0, column=3, padx=4, pady=8, sticky="ew"
+            row=0, column=4, padx=4, pady=8, sticky="ew"
         )
         ctk.CTkButton(f, text="찾아보기", width=80, command=self._browse_dir).grid(
-            row=0, column=4, padx=(4, 10), pady=8
+            row=0, column=5, padx=(4, 10), pady=8
         )
 
     def _build_mid(self, parent):
@@ -209,30 +290,38 @@ class DartApp(ctk.CTk):
         self.chk_annual  = tk.BooleanVar(value=True)
         self.chk_semi    = tk.BooleanVar(value=True)
         self.chk_quarter = tk.BooleanVar(value=True)
+        self.chk_audit   = tk.BooleanVar(value=False)
 
         for i, (text, var) in enumerate([
             ("사업보고서", self.chk_annual),
             ("반기보고서", self.chk_semi),
             ("분기보고서", self.chk_quarter),
+            ("감사보고서", self.chk_audit),
         ], start=4):
             ctk.CTkCheckBox(f, text=text, variable=var).grid(
                 row=i, column=0, columnspan=2, padx=12, pady=3, sticky="w"
             )
 
+        ctk.CTkLabel(
+            f, text="※ 감사보고서 = 단독공시(별도·연결)\n     비상장 외감법인은 이것만 있습니다",
+            text_color="gray60", justify="left", anchor="w",
+            font=ctk.CTkFont(size=11),
+        ).grid(row=8, column=0, columnspan=2, padx=(12, 12), pady=(0, 2), sticky="w")
+
         ctk.CTkLabel(f, text="저장 형식").grid(
-            row=7, column=0, padx=(12, 6), pady=(10, 4), sticky="w"
+            row=9, column=0, padx=(12, 6), pady=(10, 4), sticky="w"
         )
         self.fmt_var = tk.StringVar(value="읽기용 HTML만")
         ctk.CTkOptionMenu(
             f, variable=self.fmt_var,
             values=["원본 XML만", "원본 + 읽기용 HTML", "읽기용 HTML만"],
             width=160,
-        ).grid(row=7, column=1, padx=(0, 12), pady=(10, 4), sticky="w")
+        ).grid(row=9, column=1, padx=(0, 12), pady=(10, 4), sticky="w")
 
         self.download_btn = ctk.CTkButton(
             f, text="다운로드", height=38, command=self._do_download
         )
-        self.download_btn.grid(row=8, column=0, columnspan=2, padx=12, pady=(6, 12), sticky="ew")
+        self.download_btn.grid(row=10, column=0, columnspan=2, padx=12, pady=(6, 12), sticky="ew")
 
     def _build_log(self, parent):
         f = ctk.CTkFrame(parent)
@@ -499,6 +588,19 @@ class DartApp(ctk.CTk):
 
     # ── 이벤트 핸들러 ──────────────────────────────────────────────────────────
 
+    def _save_key(self):
+        key = self.api_key_var.get().strip()
+        if not key:
+            self._log("저장할 인증키가 비어 있습니다.")
+            return
+        try:
+            path = save_api_key(key)
+        except OSError as e:
+            self._log(f"인증키 저장 실패: {e}")
+            return
+        self._log(f"인증키를 저장했습니다 → {path}")
+        self._log("※ config.txt에는 본인 키가 들어 있습니다. 폴더째 남에게 전달하지 마세요.")
+
     def _browse_dir(self):
         path = filedialog.askdirectory(initialdir=self.save_dir_var.get())
         if path:
@@ -522,7 +624,9 @@ class DartApp(ctk.CTk):
             api_key = self.api_key_var.get().strip()
             if self.corp_list is None:
                 try:
-                    self.corp_list = load_corp_list(api_key, log_fn=self._log)
+                    self.corp_list = load_corp_list(
+                        api_key, cache_path=_CORPCODE_PATH, log_fn=self._log
+                    )
                 except Exception as e:
                     self._log(f"오류: {e}")
                     return
@@ -536,7 +640,8 @@ class DartApp(ctk.CTk):
         self._search_results = results
         self.listbox.delete(0, tk.END)
         for r in results:
-            self.listbox.insert(tk.END, f"  {r['corp_code']}  {r['corp_name']}")
+            mark = "     " if r.get("stock_code") else " [비상장]"
+            self.listbox.insert(tk.END, f"  {r['corp_code']}{mark} {r['corp_name']}")
 
     def _on_select(self, _event):
         sel = self.listbox.curselection()
@@ -549,6 +654,14 @@ class DartApp(ctk.CTk):
             text=f"선택된 회사: {name}  ({code})", text_color="white"
         )
         self._analysis_label.configure(text=f"{name}")
+
+        if not self.selected_corp.get("stock_code"):
+            self._log(
+                f"{name}: 비상장 회사입니다. 사업보고서를 제출하지 않는 외감법인이면 "
+                "'감사보고서'를 체크해야 원문을 받을 수 있고, "
+                "우측 분석 탭은 값이 비어 있을 수 있습니다."
+            )
+
         self._update_titles(name)
         self._load_financials()
         self._load_dividends()
@@ -1224,6 +1337,7 @@ class DartApp(ctk.CTk):
                 ("사업보고서", self.chk_annual),
                 ("반기보고서", self.chk_semi),
                 ("분기보고서", self.chk_quarter),
+                ("감사보고서", self.chk_audit),
             ] if var.get()
         ]
         if not report_types:
@@ -1255,11 +1369,14 @@ class DartApp(ctk.CTk):
 
                 ok = fail = skip = html_ok = html_fail = 0
                 for d in disclosures:
-                    year  = d["report_nm"].split("(")[-1][:4] if "(" in d["report_nm"] else "unknown"
-                    rtype = next((rt for rt in report_types if rt in d["report_nm"]), "기타")
-                    save_dir = os.path.join(base_dir, corp["corp_name"], f"{rtype}_{year}")
+                    year  = _report_year(d["report_nm"])
+                    rtype = _report_folder(d["report_nm"], report_types)
+                    base_name = _report_basename(d["report_nm"], rtype, year)
+                    save_dir  = os.path.join(base_dir, corp["corp_name"], f"{rtype}_{year}")
+                    self._log(f"→ {d['report_nm']}  ({d['rcept_dt']})")
                     result = download_document(
-                        api_key, d["rcept_no"], save_dir, log_fn=self._log
+                        api_key, d["rcept_no"], save_dir, log_fn=self._log,
+                        base_name=base_name,
                     )
                     if result["status"] == "성공":     ok += 1
                     elif result["status"] == "건너뜀": skip += 1
@@ -1270,7 +1387,7 @@ class DartApp(ctk.CTk):
                                      if f.lower().endswith(".xml")]
                         for fname in xml_files:
                             xml_full  = os.path.join(save_dir, fname)
-                            html_full = xml_full[:-4] + "_읽기용.html"
+                            html_full = xml_full[:-4] + ".html"
                             try:
                                 convert_to_html(xml_full, html_full, log_fn=self._log)
                                 html_ok += 1

@@ -20,6 +20,11 @@ env/
 .env
 *.key
 secrets.*
+config.txt
+
+# ── 배포 패키지 (인증키가 든 config.txt가 함께 들어감) ───────
+dart_downloader_배포_*/
+dart_downloader_배포_*.zip
 
 # ── 에디터 / OS ──────────────────────────────────────────────
 .vscode/
