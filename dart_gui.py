@@ -1,6 +1,5 @@
 import os
 import re
-import sys
 import threading
 import tkinter as tk
 from datetime import datetime
