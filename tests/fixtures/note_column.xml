@@ -17,6 +17,14 @@
 <TR><TD>4. 없는주석계정</TD><TD>99</TD><TD>50</TD><TD></TD><TD>40</TD><TD></TD></TR>
 <TR><TD ROWSPAN="2">동일계정그룹</TD><TD>7</TD><TD>10</TD><TD></TD><TD>9</TD><TD></TD></TR>
 <TR><TD>8</TD><TD>20</TD><TD></TD><TD>19</TD><TD></TD></TR>
+<TR><TD COLSPAN="6" STYLE="vertical-align:middle">27. 총포괄손익</TD></TR>
+<TR><TD>A. 연도값</TD><TD>2027</TD><TD>10</TD><TD></TD><TD>9</TD><TD></TD></TR>
+<TR><TD>B. 하이픈값</TD><TD>4-1</TD><TD>10</TD><TD></TD><TD>9</TD><TD></TD></TR>
+<TR><TD>C. 별표값</TD><TD>*27</TD><TD>10</TD><TD></TD><TD>9</TD><TD></TD></TR>
+<TR><TD>D. 콤마천단위</TD><TD>27,4567</TD><TD>10</TD><TD></TD><TD>9</TD><TD></TD></TR>
+<TR><TD>E. 빈값표시</TD><TD>-</TD><TD>10</TD><TD></TD><TD>9</TD><TD></TD></TR>
+<TR><TD>F. 겹쉼표값</TD><TD>7,,27</TD><TD>10</TD><TD></TD><TD>9</TD><TD></TD></TR>
+<TR><TD>G. 부분항목금액</TD><TD>27,234,567</TD><TD>10</TD><TD></TD><TD>9</TD><TD></TD></TR>
 </TBODY>
 </TABLE></TABLE-GROUP>
 </SECTION-2>

@@ -1,0 +1,38 @@
+<DOCUMENT>
+<DOCUMENT-NAME>사업보고서</DOCUMENT-NAME>
+<COMPANY-NAME>컬럼투세트전자</COMPANY-NAME>
+<COVER><COVER-TITLE>사 업 보 고 서</COVER-TITLE></COVER>
+<BODY>
+<SECTION-1><TITLE>III. 재무에 관한 사항</TITLE>
+<SECTION-2><TITLE>2-1. 연결 재무상태표</TITLE>
+<TABLE-GROUP><TABLE>
+<THEAD>
+<TR><TH>과 목</TH><TH>주 석</TH><TH COLSPAN="2">제 10(당) 기</TH></TR>
+</THEAD>
+<TBODY>
+<TR><TD>재고자산</TD><TD>3</TD><TD>1,000</TD><TD></TD></TR>
+</TBODY>
+</TABLE></TABLE-GROUP>
+</SECTION-2>
+<SECTION-2><TITLE>3. 연결재무제표 주석</TITLE></SECTION-2>
+<SECTION-2><TITLE>1. 지배기업의 개요 (연결)</TITLE><P>지배기업의 개요입니다.</P></SECTION-2>
+<SECTION-2><TITLE>2. 중요한 회계처리방침 (연결)</TITLE><P>내용.</P></SECTION-2>
+<SECTION-2><TITLE>3. 재고자산 (연결)</TITLE><P>재고자산 주석입니다.</P></SECTION-2>
+<SECTION-2><TITLE>6. 기타 (연결)</TITLE><P>기타 내용입니다.</P></SECTION-2>
+<SECTION-2><TITLE>4. 재무제표</TITLE>
+<TABLE-GROUP><TABLE>
+<THEAD>
+<TR><TH>과 목</TH><TH>주 석</TH><TH COLSPAN="2">제 10(당) 기</TH></TR>
+</THEAD>
+<TBODY>
+<TR><TD>재고자산</TD><TD>3</TD><TD>900</TD><TD></TD></TR>
+</TBODY>
+</TABLE></TABLE-GROUP>
+</SECTION-2>
+<SECTION-2><TITLE>5. 재무제표 주석</TITLE></SECTION-2>
+<SECTION-2><TITLE>1. 회사의 개요</TITLE><P>회사의 개요입니다.</P></SECTION-2>
+<SECTION-2><TITLE>2. 중요한 회계처리방침</TITLE><P>내용.</P></SECTION-2>
+<SECTION-2><TITLE>3. 재고자산</TITLE><P>별도 재고자산 주석입니다.</P></SECTION-2>
+</SECTION-1>
+</BODY>
+</DOCUMENT>

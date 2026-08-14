@@ -239,6 +239,35 @@ class TitleNumberMissingPeriodTest(unittest.TestCase):
         self.assertIn('<a class="nref" href="#n8">8</a>', self.html)
 
 
+class ParagraphNumberSpaceBeforePeriodTest(unittest.TestCase):
+    """문단 중간 항목 번호가 '다.' 뒤에 공백을 두고 이어지는 경우도 등록
+    해야 한다. STX 사업보고서_2022(00760 원문)에서 실제로 확인했다 —
+    '…산정하지 않았습니다. 25. 특수관계자…'. 붙여 쓴 경우('…동일합니다.
+    17. 부가가치…')만 받던 예전 _PARA_NO_MID는 이 공백 있는 모양을
+    통째로 놓쳐, 그 문서의 '25'를 참조하는 모든 칸이 이 번호 하나
+    때문에(§전부 아니면 전무 규칙) 아예 링크를 잃었다.
+    """
+
+    HTML = (
+        '<h3>주석</h3>'
+        '<p>24. 주당손익 당기와 전기 기본주당이익의 계산내역은 다음과'
+        ' 같습니다. 희석효과가 존재하지 않아 산정하지 않았습니다.'
+        ' 25. 특수관계자 (1) 당기말 현재 당사와 특수관계에 있는 회사의'
+        ' 내역은 다음과 같습니다.</p>'
+        '<p>내용은 주석 25 을 참고.</p>'
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = note_links.add_note_links(cls.HTML)
+
+    def test_space_before_period_item_registers_and_resolves(self):
+        m = re.search(r"내용은 주석(.*?)을 참고", self.html)
+        self.assertIsNotNone(m)
+        self.assertEqual(1, len(LINK.findall(m.group(1))),
+                          "'다. 25.'처럼 공백을 두고 이어지는 항목이 등록되지 않았다")
+
+
 class DigitLedSeparatorTest(unittest.TestCase):
     """숫자로 시작하지만 번호 항목이 아닌 구분 제목('6 대 매 출 처 현황'처럼
     letter-spacing된 제목)도 세트를 닫아야 한다.
@@ -437,6 +466,144 @@ class NoteColumnTest(unittest.TestCase):
         m = re.search(r"<thead>.*?</thead>", self.html, re.S)
         self.assertIsNotNone(m)
         self.assertNotIn('class="nref"', m.group(0))
+
+    def test_every_link_target_exists(self):
+        ids = _reachable_ids(self.html)
+        links = LINK.findall(self.html)
+        broken = [t for t, _ in links if t not in ids]
+        self.assertEqual([], broken, f"깨진 앵커: {broken}")
+
+    def test_full_width_label_row_not_linked(self):
+        """D1 — 자본변동표류 라벨 행('1. 총포괄손익'처럼 한 칸이 표 전체
+        열을 가로지르는 행)은 그 칸이 주석 열을 덮어도 링크되면 안 된다.
+        메가존클라우드 실 공시에서 확인한 모양이다. 라벨 번호는 이
+        픽스처에 이미 있는 항목 27을 재사용한다 — 수정 전 코드가 라벨을
+        '27'로 오인해 실제로 존재하는 항목에 잘못 링크하는 것까지
+        보여주기 위해서다(항목이 아예 없는 번호였다면 우연히 안 걸릴
+        수도 있었다)."""
+        m = re.search(r'<tr><td colspan="6"[^>]*>27\. 총포괄손익</td></tr>',
+                      self.html)
+        self.assertIsNotNone(m, "라벨 행을 찾지 못했다")
+        self.assertNotIn('class="nref"', m.group(0))
+
+    def test_junk_cell_year_not_linked(self):
+        """D3 — '2027'은 '027'로 잘려 주석 27로 링크되면 안 된다(27은
+        이 픽스처에 실제로 있는 항목이라 수정 전엔 실제로 걸렸다)."""
+        row = self._row("A. 연도값")
+        self.assertEqual([], LINK.findall(row))
+        self.assertIn("<td>2027</td>", row)
+
+    def test_junk_cell_hyphenated_not_linked(self):
+        """D3 — '4-1'은 4와 1로 쪼개져 각각 링크되면 안 된다(4는 실제
+        항목이라 수정 전엔 걸렸다)."""
+        row = self._row("B. 하이픈값")
+        self.assertEqual([], LINK.findall(row))
+        self.assertIn("<td>4-1</td>", row)
+
+    def test_junk_cell_asterisk_not_linked(self):
+        """D3 — '*27'의 27이 주석으로 링크되면 안 된다(27은 실제 항목이라
+        수정 전엔 걸렸다)."""
+        row = self._row("C. 별표값")
+        self.assertEqual([], LINK.findall(row))
+        self.assertIn("<td>*27</td>", row)
+
+    def test_junk_cell_thousands_separated_not_linked(self):
+        """D3 — '27,4567'에서 어느 숫자도 잘못 링크되면 안 된다(수정 전엔
+        앞의 '27'이 실제 항목에 걸렸다). 전체 텍스트가 순수 번호 목록
+        모양이 아니므로(뒤 조각이 네 자리) 칸째 버려져야 한다."""
+        row = self._row("D. 콤마천단위")
+        self.assertEqual([], LINK.findall(row))
+        self.assertIn("<td>27,4567</td>", row)
+
+    def test_junk_cell_dash_not_linked(self):
+        """D3 — 값 없음을 뜻하는 '-'는 링크되면 안 된다. 숫자가 아예
+        없어 수정 전 코드도 이 칸만은 잘못 걸 수 없었다 — 방어적
+        회귀 테스트로 남긴다."""
+        row = self._row("E. 빈값표시")
+        self.assertEqual([], LINK.findall(row))
+        self.assertIn("<td>-</td>", row)
+
+    def test_doubled_separator_still_links_all_numbers(self):
+        """구분자가 겹쳐도('7,,27') 명백한 주석 번호 목록이면 번호를 모두
+        링크해야 한다 — STX 사업보고서_2023 실 공시의 '6,,13,14,15,16,
+        27,29'(DART 원문 오탈자)가 정확히 이 모양이다. 구분자를 하나만
+        허용하던 수정 전엔 이 칸 전체가 버려져 7과 27 둘 다 링크를
+        잃었다."""
+        row = self._row("F. 겹쉼표값")
+        self.assertEqual([("sec5", "7"), ("sec7", "27")], LINK.findall(row))
+
+    def test_cell_with_one_unresolvable_number_links_nothing(self):
+        """전부 아니면 전무 — '27,234,567'은 문법상 순수 번호 목록이지만
+        (구분자가 느슨해진 뒤로 '1,234,567' 같은 천단위 금액도 문법은
+        통과한다) 234와 567엔 항목이 없다. 번호별로 있으면 걸고 없으면
+        두는 식이었다면 27만(우연히 존재하는 항목이라) 잘못 링크됐을
+        것이다 — 전부 아니면 전무 규칙은 27도 함께 버려야 한다."""
+        row = self._row("G. 부분항목금액")
+        self.assertEqual([], LINK.findall(row))
+        self.assertIn("<td>27,234,567</td>", row)
+
+
+class NoteColumnHeaderRowspanTest(unittest.TestCase):
+    """D2 — 둘째 헤더 행에 '주석'이 있고 그 위 행에 rowspan이 있으면,
+    그 rowspan이 아래 행의 열 위치를 밀었을 수 있어 열 인덱스를 확신할
+    수 없다. 짐작해서 잘못 링크하느니 표 전체를 링크하지 않아야 한다
+    (실 공시엔 아직 이 모양이 없다 — latent 결함).
+    """
+
+    HTML = (
+        '<h3>주석</h3>'
+        '<h3 id="n1">1. 회사의 개요</h3><p>내용.</p>'
+        '<table><thead>'
+        '<tr><th rowspan="2">과 목</th><th colspan="3">제10기</th></tr>'
+        '<tr><th>주 석</th><th>당기</th><th>전기</th></tr>'
+        '</thead><tbody>'
+        '<tr><td>1</td><td>100</td><td>90</td></tr>'
+        '</tbody></table>'
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = note_links.add_note_links(cls.HTML)
+
+    def test_table_links_nothing(self):
+        """위 행의 rowspan 때문에 열 인덱스를 못 믿으므로 표 전체를
+        링크하지 않아야 한다(수정 전엔 잘못 계산된 열 인덱스로 첫 칸을
+        링크했다)."""
+        self.assertEqual([], LINK.findall(self.html))
+
+
+class NoteColumnTwoSetTest(unittest.TestCase):
+    """전용 '주석' 열(모양 ②)을 연결·별도 두 세트가 함께 쓰는 경우.
+
+    두 재무상태표 모두 열 방식으로 '주석 3'을 표시하지만, 각자 다른
+    세트(연결/별도)의 3번 항목을 가리켜야 한다 — 기존 note_column.xml은
+    단일 세트뿐이라 이 경로(연결/별도 분기 + 열 방식)를 전혀 검증하지
+    못했다.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = note_links.add_note_links(_body("note_column_two_sets"))
+
+    def _row(self):
+        return re.findall(r"<tr><td[^>]*>재고자산</td>(.*?)</tr>", self.html)
+
+    def test_each_table_resolves_to_its_own_set(self):
+        """연결 재무상태표의 주석3은 연결 세트의 '3. 재고자산 (연결)'
+        제목(sec6)으로, 별도 재무상태표의 주석3은 별도 세트의
+        '3. 재고자산' 제목(sec12)으로 가야 한다 — 같은 번호 3이 표
+        방식(모양 ②)으로도 세트별로 정확히 갈라져야 한다."""
+        rows = self._row()
+        self.assertEqual(2, len(rows), "재고자산 행 2개를 찾지 못했다")
+        consolidated, separate = rows
+        self.assertEqual([("sec6", "3")], LINK.findall(consolidated),
+                          "연결 재무상태표의 주석3이 연결 세트로 가지 않았다")
+        self.assertEqual([("sec12", "3")], LINK.findall(separate),
+                          "별도 재무상태표의 주석3이 별도 세트로 가지 않았다")
+        heading_c = _heading_text(self.html, "sec6")
+        heading_s = _heading_text(self.html, "sec12")
+        self.assertIn("(연결)", heading_c)
+        self.assertNotIn("(연결)", heading_s)
 
     def test_every_link_target_exists(self):
         ids = _reachable_ids(self.html)

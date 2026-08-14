@@ -15,6 +15,15 @@ DART는 재무제표에 주석 번호를 두 가지 모양으로 단다.
      앞 칸들의 colspan을 더해 열 번호를 구하고, 본문 각 행에서 같은 방식
      으로 그 열을 짚어 번호를 뽑는다. 두 모양 모두 번호를 찾은 뒤엔 같은
      _resolve_set으로 연결·별도를 가른다.
+
+후속 과제(지금 하지 않음) — 전용 열(모양 ②)의 열 인덱스 산수는 colspan을
+누적하는 위치 계산일 뿐, rowspan을 정말로 풀어내는 HTML 표 그리드 알고리즘이
+아니다. 그래서 "이 행 자신의 colspan 합이 헤더 전체 열 수와 맞는지"와
+"헤더 위쪽 행에 rowspan이 있는지"라는 가드에 기대어 안전한 쪽(=링크하지
+않는 쪽)으로만 실패한다. 제대로 고치려면 표 전체를 rowspan/colspan을 모두
+해석하는 진짜 그리드로 풀어 셀 좌표를 구하는 알고리즘으로 갈아엎어야 한다.
+지금 방식은 실 공시 32건에서는 문제없이 동작하므로, 그런 사례가 실제로
+나타나기 전까지는 미룬다.
 """
 import re
 
@@ -47,9 +56,12 @@ _TITLE_NO_LIKE = re.compile(r"^\d{1,2}(?:-\d+\.?|\.)")
 _PARA_NO = re.compile(r"^\s*(\d{1,2})(?:-\d+)?\s*\.")
 
 # 문단 중간에서 시작하는 주석. DART가 논리 문단을 한 <p>에 뭉쳐 넣는다 —
-# '…희석주당손익은 동일합니다.17. 부가가치 관련자료…'
-# 뒤에 숫자가 오면 '3.5배' 같은 소수라 제외한다.
-_PARA_NO_MID = re.compile(r"(?<=다\.)(\d{1,2})\.\s*(?=[^\d\s])")
+# 붙여서('…희석주당손익은 동일합니다.17. 부가가치 관련자료…')도, 띄어서
+# ('…산정하지 않았습니다. 25. 특수관계자…')도 나온다. 두 모양 다 받도록
+# '다.'와 번호 사이의 공백은 있어도 없어도 되게 한다(lookbehind는 고정
+# 폭이라 '다\.' 뒤에 별도로 \s*를 둔다). 뒤에 숫자가 오면 '3.5배'·
+# '2024. 12. 31' 같은 소수·날짜라 제외한다.
+_PARA_NO_MID = re.compile(r"(?<=다\.)\s*(\d{1,2})\.\s*(?=[^\d\s])")
 
 # 본문 참조. '주석' 바로 뒤에 숫자가 와야 한다.
 #   (주석3,4) / 주석 4, 5 / 주석 17 및 28 / 주석30
@@ -72,7 +84,21 @@ _TR = re.compile(r"<tr>(.*?)</tr>", re.S)
 # 본다(\1 역참조). DART 변환기는 늘 짝을 맞춰 내므로 안전하다.
 _CELL = re.compile(r"<t([hd])\b([^>]*)>(.*?)</t\1>", re.S)
 _COLSPAN_ATTR = re.compile(r'colspan="(\d+)"')
+_ROWSPAN_ATTR = re.compile(r'rowspan="(\d+)"')
 _WS = re.compile(r"\s+")
+
+# 전용 '주석' 열 칸이 '진짜 순수한 주석 번호 목록'인지 검사한다. 칸의
+# 눈에 보이는 텍스트 전체(공백 정리 후)가 이 모양이어야만 그 칸을 받아
+# 준다 — 하나라도 안 맞으면(라벨 행·연도·'4-1'·'*1'·값) 칸 전체를
+# 버린다. 일부만 긁어내는 예전 방식(_REF_NUM을 칸 텍스트에 바로 돌리기)은
+# '2024'에서 '024'를 주석 24로, '4-1'에서 4와 1을 각각, '*1'에서 1을
+# 주석으로 잘못 읽어냈다.
+#
+# 구분자는 하나 이상 연속돼도 받아준다([,및·]+) — STX 사업보고서_2023
+# 실 공시에 'DART 원문 자체의 오탈자로 '6,,13,14,15,16,27,29'처럼 쉼표가
+# 두 번 연달아 나오는 칸이 실제로 있었다. 명백히 주석 번호 목록인데
+# 쉼표가 겹쳤다는 이유만으로 7개 링크를 통째로 잃을 이유가 없다.
+_NOTE_CELL_TEXT = re.compile(r"^\d{1,3}(?:\s*[,및·]+\s*\d{1,3})*$")
 
 NREF_CLASS = "nref"
 
@@ -386,6 +412,14 @@ def _note_column_index(masked_table_html):
     """헤더 행에서 '주석'(공백 허용) 칸을 찾아 (열 인덱스, 그 행의 전체
     열 수)를 돌려준다. <thead>가 없거나 '주석' 칸이 없으면 None — thead
     없는 표는 아예 다루지 않는다(실 공시 26건 중 그런 사례가 없었다).
+
+    다중행 헤더 대비: '주석' 칸을 찾은 행보다 위쪽 행에 rowspan이 있으면
+    그 rowspan이 아래 행의 칸들을 밀었을 수 있다 — 지금은 각 행 자신의
+    colspan만 누적하는 위치 산수라 그렇게 밀린 열 인덱스를 제대로 못
+    구한다(rowspan을 실제로 해석하는 그리드 알고리즘이 진짜 고침이지만
+    지금은 하지 않는다 — 모듈 docstring 참고). 그래서 위쪽 행에
+    rowspan이 있으면 짐작하지 않고 None을 돌려 그 표 전체를 링크하지
+    않는다 — 링크가 없는 편이 잘못된 열을 짚는 것보다 낫다.
     """
     thead_m = _THEAD.search(masked_table_html)
     if not thead_m:
@@ -400,6 +434,8 @@ def _note_column_index(masked_table_html):
             col += cs
         if note_col is not None:
             return note_col, col
+        if _ROWSPAN_ATTR.search(tr_m.group(1)):
+            return None            # 이 행의 rowspan이 아래 행 열을 밀었을 수 있다
     return None
 
 
@@ -414,6 +450,38 @@ def _collect_column_ref_edits(html, sets, marks, inline_spans):
     자신의 <td>들이 낸 colspan 합이 헤더의 전체 열 수와 안 맞으면, 그
     칸이 실제로 몇 번째 열인지 추측하지 않고 행 전체를 건너뛴다 — 잘못
     링크하느니 안 거는 쪽이 낫다.
+
+    칸 전체 채택 안전장치: 자본변동표류엔 표 전체 너비를 가로지르는
+    라벨 행이 있다('<td colspan="8">1. 총포괄손익</td>'). 이 한 칸이
+    표 전체 열을 덮으므로 colspan 합은 헤더와 맞아떨어지고, 주석 열도
+    당연히 이 칸에 걸린다 — 행 정렬 안전장치로는 절대 걸러지지 않는
+    부류다. 그래서 칸을 찾은 뒤 두 가지를 더 요구한다: (1) 그 칸
+    자신의 colspan이 1(또는 없음)이어야 한다 — 라벨 행처럼 여러 열을
+    가로지르는 칸은 애초에 후보에서 뺀다. (2) 칸의 눈에 보이는 텍스트
+    전체가 순수한 주석 번호 목록 모양(_NOTE_CELL_TEXT)이어야 한다 —
+    하나라도 아니면 칸을 통째로 버리고, 숫자만 긁어내는 부분 채택은
+    하지 않는다('2024'에서 '024'만, '4-1'에서 4와 1을 따로, '*1'에서
+    1을 주석으로 읽는 예전 버그를 막는다).
+
+    전부 아니면 전무(all-or-nothing) 안전장치: _NOTE_CELL_TEXT는 구분자가
+    겹쳐도('6,,13' 같은 DART 원문 오탈자) 받아주도록 느슨하다. 그런데
+    그 느슨함 때문에 '1,234,567'처럼 세 자리씩 끊어 쓴 금액도 문법상으로는
+    똑같이 '순수한 번호 목록'처럼 보인다. 이런 칸에서 번호별로 있으면
+    걸고 없으면 두는 식(인라인 경로와 같은 방식)으로 하면, 우연히
+    항목이 있는 '1'만 링크되고 '234'·'567'은 조용히 버려져 결과적으로
+    링크 하나가 잘못 걸린 것과 같은 효과를 낸다. 그래서 이 칸의 번호는
+    전부 아니면 전무로 다룬다 — 칸 안의 모든 번호가 각자 항목을 찾아야
+    (하나라도 항목이 없으면 그 칸은 통째로 버리고) 그제서야 전부 링크한다.
+    진짜 주석 칸이라면 적힌 번호 모두가 실재하는 주석을 가리켜야
+    자연스럽다 — 하나라도 항목이 없다면 애초에 이 칸을 주석 열로 잘못
+    짚었을 가능성이 높다는 뜻이므로, 그 칸은 아무것도 믿지 않는다.
+
+    인라인 경로(_collect_ref_edits)는 이와 반대로 항목이 있는 번호만
+    골라 걸고 없는 번호는 그냥 둔다 — 일부러 다르게 짠 것이니 "일관성
+    없다"며 나중에 고치지 말 것. 인라인 경로엔 '주석'이라는 글자 자체가
+    그 자리가 진짜 주석 참조라는 확증이 있지만, 이 열 경로는 확증이
+    위치(열 인덱스) 하나뿐이다 — 확증이 약한 만큼 항목 불일치 하나에도
+    칸 전체를 더 보수적으로 버려야 한다.
 
     표 칸에는 '주석'이라는 글자가 없으므로 인라인 경로(_REF)와 겹칠 일이
     실제로는 없지만, inline_spans로 이미 링크된 자리를 한 번 더 걸러
@@ -432,17 +500,28 @@ def _collect_column_ref_edits(html, sets, marks, inline_spans):
             row = tr_m.group(1)
             col = 0
             note_span = None
+            note_cs = None
             for cell_m in _CELL.finditer(row):
                 cs = _colspan(cell_m.group(2))
                 if col <= note_col < col + cs:
                     note_span = (tr_m.start(1) + cell_m.start(3),
                                  tr_m.start(1) + cell_m.end(3))
+                    note_cs = cs
                 col += cs
             if col != header_total or note_span is None:
                 continue          # 정렬이 안 맞는 행 — 짐작하지 않고 건너뛴다
+            if note_cs != 1:
+                continue          # 여러 열을 가로지르는 칸 — 라벨 행일 수 있다
             abs_start = start + note_span[0]
             abs_end = start + note_span[1]
             cell_html = html[abs_start:abs_end]
+            if not _NOTE_CELL_TEXT.match(_text_of(cell_html)):
+                continue          # 순수 주석 번호 목록이 아니다 — 칸째 버린다
+            # 전부 아니면 전무: 이 칸의 번호를 모두 모아본 뒤, 하나라도
+            # 항목을 못 찾으면 칸 전체를 포기한다(이미 인라인으로 링크된
+            # 번호만 후보에서 뺀다 — 그건 이 칸의 판단과 무관하다).
+            candidates = []
+            cell_ok = True
             for seg_start, seg_end in _text_segments(cell_html):
                 text_seg = cell_html[seg_start:seg_end]
                 for nm in _REF_NUM.finditer(text_seg):
@@ -454,10 +533,17 @@ def _collect_column_ref_edits(html, sets, marks, inline_spans):
                     note_set = _resolve_set(sets, marks, num_start, before)
                     anchor = note_set.items.get(int(nm.group()))
                     if not anchor:
-                        continue
-                    edits.append((num_start, num_end,
-                                  f'<a class="{NREF_CLASS}" href="#{anchor}">'
-                                  f'{nm.group()}</a>'))
+                        cell_ok = False
+                        break
+                    candidates.append((num_start, num_end, anchor, nm.group()))
+                if not cell_ok:
+                    break
+            if not cell_ok:
+                continue          # 번호 하나라도 항목이 없다 — 칸째 버린다
+            for num_start, num_end, anchor, numtext in candidates:
+                edits.append((num_start, num_end,
+                              f'<a class="{NREF_CLASS}" href="#{anchor}">'
+                              f'{numtext}</a>'))
     return edits
 
 
