@@ -75,12 +75,23 @@ def render(ctx, state, data=None, year=None):
         return
 
     f = ctk.CTkFrame(ctx.content, fg_color="transparent")
-    f.grid(row=0, column=0, sticky="nw", padx=8, pady=8)
+    # sticky="new": 위/왼쪽/오른쪽에 다 붙여 컨텐츠 폭(ScrollFrame이 캔버스
+    # 폭에 맞춰 준 content의 폭)을 그대로 물려받는다. 예전의 "nw"는 왼쪽에만
+    # 붙어 표가 항상 제 내용만큼의 폭(590px)으로 고정됐었다 — 창을 넓혀도
+    # 좁혀도 표 폭이 안 바뀌던 원인.
+    f.grid(row=0, column=0, sticky="new", padx=8, pady=8)
 
-    headers = [("주주명", 180, "w"), ("관계", 100, "w"),
-               ("주식종류", 90, "w"), ("기말주식수", 130, "e"), ("지분율(%)", 90, "e")]
-    for ci, (h, w, anchor) in enumerate(headers):
-        table_header(f, h, width=w, anchor=anchor, row=0, column=ci, padx=4, pady=4)
+    # (헤더 텍스트, anchor, weight, minsize). 텍스트 열(주주명·관계·주식종류)은
+    # weight를 받아 창 폭에 맞춰 늘고 준다 — 특히 주주명은 법인명이 길 때가
+    # 많아 weight를 더 준다. 숫자 열(기말주식수·지분율)은 weight=0으로 고정
+    # 폭을 유지하고 오른쪽 정렬을 지킨다(같은 정렬 의도 유지). minsize는
+    # 바닥값일 뿐 — 실제 셀 내용이 더 넓으면 grid가 알아서 그만큼 넓힌다.
+    headers = [("주주명", "w", 3, 90), ("관계", "w", 1, 60),
+               ("주식종류", "w", 1, 60), ("기말주식수", "e", 0, 100),
+               ("지분율(%)", "e", 0, 70)]
+    for ci, (h, anchor, weight, minsize) in enumerate(headers):
+        f.grid_columnconfigure(ci, weight=weight, minsize=minsize)
+        table_header(f, h, anchor=anchor, row=0, column=ci, padx=4, pady=4)
 
     table_separator(f, row=1, column=0, columnspan=len(headers), pady=2)
 

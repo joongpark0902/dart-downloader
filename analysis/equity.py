@@ -96,13 +96,18 @@ def render(ctx, state, data=None, year=None, corp_name=""):
     scroll.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
     ctx.content.grid_rowconfigure(1, weight=1)
 
-    COL_W = [200, 105, 72, 115]   # 법인명, 최초취득일, 지분율, 기말장부가액
     HEADERS = ["법인명", "최초취득일", "지분율", "기말장부가액"]
+    # (weight, minsize). 법인명만 weight를 받아 늘고 준다 — 긴 법인명이
+    # 흔한 열이라 창이 넓어지면 여기로 여유 폭이 간다. 나머지 셋(취득일·
+    # 지분율·장부가액)은 원래도 오른쪽 정렬 고정폭이었으므로 weight=0으로
+    # 그 정렬 의도를 그대로 지킨다.
+    COLS = [(1, 110), (0, 90), (0, 55), (0, 85)]
 
     # 헤더 행
-    for ci, (h, w) in enumerate(zip(HEADERS, COL_W)):
+    for ci, (h, (weight, minsize)) in enumerate(zip(HEADERS, COLS)):
         anchor = "w" if ci == 0 else "e"
-        table_header(scroll, h, width=w, anchor=anchor,
+        scroll.grid_columnconfigure(ci, weight=weight, minsize=minsize)
+        table_header(scroll, h, anchor=anchor,
                      row=0, column=ci, padx=(0 if ci else 4, 4), pady=4)
 
     table_separator(scroll, row=1, column=0, columnspan=4, pady=2)

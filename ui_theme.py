@@ -148,7 +148,13 @@ def table_cell(parent, text, *, bg, fg=TABLE_CELL_DEFAULT_FG, anchor="w", **grid
         parent, text=text, bg=bg, fg=fg, font=TABLE_CELL_FONT,
         anchor=anchor, bd=0, highlightthickness=0, padx=0, pady=0,
     )
-    lbl.grid(sticky=anchor, **grid_kwargs)
+    # sticky="ew"(기본값)로 열이 grid_columnconfigure(weight=...)를 받아
+    # 넓어졌을 때도 이 셀이 그 폭을 꽉 채운다 — 안 그러면 열은 넓어져도
+    # 셀(과 zebra_bg 배경)은 옛 폭에 머물러 줄무늬 오른쪽에 빈 틈이 생긴다.
+    # 글자 위치는 anchor가 그대로 맡는다(가운데 문자열이 아니라 왼쪽/오른쪽
+    # 정렬 그대로). 호출측이 sticky를 직접 넘기면 그 값이 우선한다.
+    grid_kwargs.setdefault("sticky", "ew")
+    lbl.grid(**grid_kwargs)
     return lbl
 
 
@@ -183,7 +189,11 @@ def table_header(parent, text, *, anchor="w", width=None, **grid_kwargs):
         parent, text=text, fg_color=TABLE_HEADER_BG, text_color=TEXT_SECONDARY,
         font=TABLE_HEADER_FONT, anchor=anchor, corner_radius=0, **extra,
     )
-    lbl.grid(sticky=anchor, **grid_kwargs)
+    # table_cell과 같은 이유로 sticky 기본값을 "ew"로 둔다 — 열이 넓어지면
+    # 헤더 배경(TABLE_HEADER_BG)도 그 폭을 꽉 채워야 데이터 행 줄무늬와
+    # 오른쪽 경계가 어긋나 보이지 않는다.
+    grid_kwargs.setdefault("sticky", "ew")
+    lbl.grid(**grid_kwargs)
     return lbl
 
 
@@ -253,16 +263,26 @@ def _ensure_scrollbar_style():
 
 
 class ScrollFrame(tk.Frame):
-    """CTkScrollableFrame을 대신하는 순수 tkinter 세로 스크롤 컨테이너.
+    """CTkScrollableFrame을 대신하는 순수 tkinter 스크롤 컨테이너.
 
-    tk.Canvas 위에 내용 프레임을 얹고, 내용이 넘칠 때만 세로 스크롤바를
-    붙이는 표준 레시피다. 반환되는 객체 자신이 "내용을 담는 프레임"이다
-    — 지금까지 CTkScrollableFrame을 쓰던 곳과 똑같이 이 위에 자식 위젯을
+    tk.Canvas 위에 내용 프레임을 얹고, 내용이 넘칠 때만 스크롤바를 붙이는
+    표준 레시피다. 반환되는 객체 자신이 "내용을 담는 프레임"이다 —
+    지금까지 CTkScrollableFrame을 쓰던 곳과 똑같이 이 위에 자식 위젯을
     만들고 grid()하면 된다(analysis/*.py의 render()들이 `ctx.content`를
     그냥 부모 삼아 자식을 추가/파괴하는 기존 코드를 한 글자도 안 고쳐도
     되게 하기 위한 설계다). 다만 이 프레임을 부모 위젯 안에 배치하는
     grid() 호출만은, 실제로는 캔버스+스크롤바를 감싼 바깥 컨테이너
     (self._outer)에 적용되도록 오버라이드했다.
+
+    가로 스크롤: 안쪽 프레임의 폭은 "캔버스 폭"과 "내용이 실제로 필요한
+    최소 폭"(grid_columnconfigure의 minsize·실제 셀 내용이 요구하는 폭
+    중 큰 쪽 — self.winfo_reqwidth())의 더 큰 값으로 잡는다(_on_canvas_
+    configure). 캔버스가 더 넓으면 안쪽 프레임이 캔버스 폭까지 늘어나
+    (weight를 받은 열이 늘고 줄어) 오른쪽 정렬 셀이 진짜 가장자리에
+    붙는다. 반대로 창을 좁혀도 표가 최소 폭 아래로는 안 줄어들고, 그
+    최소 폭이 캔버스보다 넓어지는 순간(=weight=0 열의 minsize와 실제
+    셀 내용만으로도 이미 캔버스보다 넓을 때)만 가로 스크롤바가 나타나
+    표를 옆으로 밀어 볼 수 있게 한다 — 화면 밖으로 조용히 잘리는 대신.
     """
 
     def __init__(self, parent, bg=SURFACE, **kwargs):
@@ -281,6 +301,15 @@ class ScrollFrame(tk.Frame):
         )
         self._vbar_visible = False
         self._canvas.configure(yscrollcommand=self._vbar.set)
+
+        # 가로 스크롤바: 표가 최소 폭에서도 캔버스보다 넓을 때만(_sync_
+        # hscrollbar) row=1에 붙는다 — 세로 스크롤바처럼 기본은 숨김이다.
+        self._hbar = ttk.Scrollbar(
+            self._outer, orient="horizontal", command=self._canvas.xview,
+            style=_SCROLLBAR_STYLE,
+        )
+        self._hbar_visible = False
+        self._canvas.configure(xscrollcommand=self._hbar.set)
 
         kwargs.setdefault("bg", bg)
         super().__init__(self._canvas, **kwargs)
@@ -334,21 +363,31 @@ class ScrollFrame(tk.Frame):
 
     def _on_inner_configure(self, _event=None):
         self._canvas.configure(scrollregion=self._canvas.bbox("all"))
-        self._sync_scrollbar()
+        self._sync_vscrollbar()
         self._bind_wheel(self)
 
     def _on_canvas_configure(self, event):
-        # 안쪽 프레임을 캔버스 폭에 맞춰 늘린다 — 그래야 오른쪽 정렬
-        # 셀(금액 열 등)이 진짜 표 가장자리에 붙는다.
-        self._canvas.itemconfigure(self._window_id, width=event.width)
-        self._sync_scrollbar()
+        # 안쪽 프레임 폭 = max(캔버스 폭, 내용이 실제로 필요한 최소 폭).
+        # self.winfo_reqwidth()는 self의 grid 자식들(표 프레임 f/sub 등)이
+        # grid_columnconfigure(minsize=...)·실제 셀 내용으로 요구하는
+        # "자연스러운" 최소 폭이다 — 이 값은 캔버스 아이템에 폭을 강제로
+        # 줬던 과거 호출과 무관하게 항상 자식 기준으로 다시 계산된다
+        # (self는 canvas.create_window로 배치되어 place처럼 외부에서 크기가
+        # 정해지지만, self 내부의 grid_propagate는 그대로 켜져 있어
+        # winfo_reqwidth()는 이 시점의 자식 요구 폭을 그대로 돌려준다).
+        self.update_idletasks()
+        min_w = self.winfo_reqwidth()
+        width = max(event.width, min_w)
+        self._canvas.itemconfigure(self._window_id, width=width)
+        self._sync_vscrollbar()
+        self._sync_hscrollbar(need=min_w > event.width)
 
-    def _sync_scrollbar(self):
-        """내용이 넘칠 때만 스크롤바를 붙이고, 아니면 뗀다.
+    def _sync_vscrollbar(self):
+        """내용이 세로로 넘칠 때만 세로 스크롤바를 붙이고, 아니면 뗀다.
 
         grid()/grid_forget()는 표시 상태가 실제로 바뀔 때만 부른다
         (self._vbar_visible로 판단). 무조건 매번 토글하면 스크롤바
-        유무가 캔버스 폭을 바꾸고, 그게 다시 <Configure>를 불러 폭이
+        유무가 캔버스 크기를 바꾸고, 그게 다시 <Configure>를 불러 크기가
         바뀌고 또 유무 판단이 바뀌는 무한 루프(레이아웃 지터)에 빠진다.
         """
         self._canvas.update_idletasks()
@@ -361,6 +400,20 @@ class ScrollFrame(tk.Frame):
         elif not need and self._vbar_visible:
             self._vbar.grid_forget()
             self._vbar_visible = False
+
+    def _sync_hscrollbar(self, need):
+        """표가 최소 폭에서도 캔버스보다 넓을 때만(need) 가로 스크롤바를
+        붙인다 — _sync_vscrollbar와 같은 이유로 표시 상태가 바뀔 때만
+        grid()/grid_forget()를 부른다. 이 조건을 만족하는 탭이 실제로는
+        거의 없다(아주 좁은 창에서만 닿는 탭이 있을 수 있다) — 그래서
+        대부분의 탭에서는 이 스크롤바가 한 번도 나타나지 않는다.
+        """
+        if need and not self._hbar_visible:
+            self._hbar.grid(row=1, column=0, sticky="ew")
+            self._hbar_visible = True
+        elif not need and self._hbar_visible:
+            self._hbar.grid_forget()
+            self._hbar_visible = False
 
 
 def fmt_val(val):

@@ -8,6 +8,7 @@ self._ratio_title → ctx.title_label 로 바꿨다.
 """
 import customtkinter as ctk
 
+import ui_theme
 from ui_theme import NEGATIVE, TEXT_SECONDARY, fmt_ratio_val, table_header, table_separator
 
 # 라이트 팔레트에는 표준 warning색이 없어(NEGATIVE는 오류/음수 전용) 이
@@ -41,10 +42,12 @@ def build(parent, app):
     )
     title_label.grid(row=0, column=0, padx=12, pady=(10, 4), sticky="w")
 
-    content = ctk.CTkFrame(parent, fg_color="transparent")
+    # div.py와 같은 이유로 ui_theme.ScrollFrame을 쓴다 — 3개년 열이 아주
+    # 좁은 창에서 최소 폭에 닿으면 가로 스크롤바가 조용히 잘리는 대신
+    # 옆으로 밀어 보게 해 준다.
+    content = ui_theme.ScrollFrame(parent)
     content.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
     content.grid_columnconfigure(0, weight=1)
-    content.grid_rowconfigure(0, weight=1)
 
     return Ctx(title_label, content)
 
@@ -67,13 +70,19 @@ def render(ctx, state, data=None, years=None):
         return
 
     f = ctk.CTkFrame(ctx.content, fg_color="transparent")
-    f.grid(row=0, column=0, sticky="n", padx=8, pady=8)
-    col_w = 110
+    # sticky="new": fin.py와 같은 이유 — content가 물려준 폭을 채운다.
+    f.grid(row=0, column=0, sticky="new", padx=8, pady=8)
+
+    # 항목(레이블) 열만 weight를 받아 늘고 준다. 연도 값 열은 원래도
+    # 오른쪽 정렬 고정폭이었으므로 weight=0으로 유지한다(같은 정렬 의도).
+    f.grid_columnconfigure(0, weight=1, minsize=110)
+    for ci in range(len(years)):
+        f.grid_columnconfigure(ci + 1, weight=0, minsize=90)
 
     # 헤더
-    table_header(f, "항목", width=120, row=0, column=0, padx=(0, 8), pady=4)
+    table_header(f, "항목", row=0, column=0, padx=(0, 8), pady=4)
     for ci, yr in enumerate(years):
-        table_header(f, f"{yr}년", width=col_w, anchor="e", row=0, column=ci+1, padx=4, pady=4)
+        table_header(f, f"{yr}년", anchor="e", row=0, column=ci+1, padx=4, pady=4)
 
     table_separator(f, row=1, column=0, columnspan=len(years)+1, pady=2)
 
@@ -82,15 +91,15 @@ def render(ctx, state, data=None, years=None):
         if label in ("부채비율", "매출총이익률"):
             table_separator(f, row=ri+2, column=0, columnspan=len(years)+1, pady=2)
 
-        ctk.CTkLabel(f, text=label, width=120, anchor="w").grid(
+        ctk.CTkLabel(f, text=label, anchor="w").grid(
             row=ri+2, column=0, padx=(0, 8), pady=6, sticky="w"
         )
         for ci, row_data in enumerate(data):
             val = row_data.get(label)
             text, color = fmt_ratio_val(val)
             ctk.CTkLabel(f, text=text, text_color=color,
-                         width=col_w, anchor="e").grid(
-                row=ri+2, column=ci+1, padx=4, pady=6
+                         anchor="e").grid(
+                row=ri+2, column=ci+1, padx=4, pady=6, sticky="e"
             )
 
 

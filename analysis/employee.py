@@ -8,6 +8,7 @@ import threading
 
 import customtkinter as ctk
 
+import ui_theme
 from financials import get_employee_status
 from ui_theme import NEGATIVE, TEXT_PRIMARY, TEXT_SECONDARY, table_header, table_separator
 
@@ -34,10 +35,12 @@ def build(parent, app):
     )
     title_label.grid(row=0, column=0, padx=12, pady=(10, 4), sticky="w")
 
-    content = ctk.CTkFrame(parent, fg_color="transparent")
+    # div.py와 같은 이유로 ui_theme.ScrollFrame을 쓴다 — 성별 2열+합계
+    # 열은 매우 좁은 창에서 최소 폭에 닿을 수 있어, 그때 가로 스크롤바가
+    # 조용히 잘리는 대신 옆으로 밀어 보게 해 준다.
+    content = ui_theme.ScrollFrame(parent)
     content.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
     content.grid_columnconfigure(0, weight=1)
-    content.grid_rowconfigure(0, weight=1)
 
     return Ctx(title_label, content)
 
@@ -60,26 +63,34 @@ def render(ctx, state, data=None, year=None):
         return
 
     f = ctk.CTkFrame(ctx.content, fg_color="transparent")
-    f.grid(row=0, column=0, sticky="n", padx=8, pady=8)
+    # sticky="new": div.py와 같은 이유 — content가 물려준 폭을 채운다.
+    f.grid(row=0, column=0, sticky="new", padx=8, pady=8)
 
-    label_w, val_w = 160, 140
+    gender_names = [g["성별"] for g in data["성별"]]
+    n_val_cols = len(gender_names) + 1   # 성별 열 + 합계 열
+
+    # 항목(레이블) 열만 weight를 받아 늘고 준다("1인평균급여(연간)"처럼 긴
+    # 레이블이 있다). 성별·합계 값 열은 원래도 오른쪽 정렬 고정폭이었으므로
+    # weight=0으로 유지한다(같은 정렬 의도).
+    f.grid_columnconfigure(0, weight=1, minsize=150)
+    for ci in range(n_val_cols):
+        f.grid_columnconfigure(ci + 1, weight=0, minsize=110)
 
     def _row(parent, r, label, *vals):
-        ctk.CTkLabel(parent, text=label, width=label_w, anchor="w").grid(
+        ctk.CTkLabel(parent, text=label, anchor="w").grid(
             row=r, column=0, padx=(0, 12), pady=6, sticky="w"
         )
         for ci, (txt, color) in enumerate(vals):
             ctk.CTkLabel(parent, text=txt, text_color=color,
-                         width=val_w, anchor="e").grid(
-                row=r, column=ci + 1, padx=4, pady=6
+                         anchor="e").grid(
+                row=r, column=ci + 1, padx=4, pady=6, sticky="e"
             )
 
     # 성별 헤더
-    table_header(f, "항목", width=label_w, row=0, column=0, padx=(0, 12), pady=4)
-    gender_names = [g["성별"] for g in data["성별"]]
+    table_header(f, "항목", row=0, column=0, padx=(0, 12), pady=4)
     for ci, g in enumerate(gender_names):
-        table_header(f, g, width=val_w, anchor="e", row=0, column=ci + 1, padx=4, pady=4)
-    table_header(f, "합계", width=val_w, anchor="e",
+        table_header(f, g, anchor="e", row=0, column=ci + 1, padx=4, pady=4)
+    table_header(f, "합계", anchor="e",
                  row=0, column=len(gender_names) + 1, padx=4, pady=4)
 
     table_separator(f, row=1, column=0, columnspan=len(gender_names) + 2, pady=2)
