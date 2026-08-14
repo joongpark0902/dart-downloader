@@ -217,7 +217,21 @@ def _index_sets(html):
 
 
 def _index_paragraph_items(html, note_set):
-    """제목형 항목이 없는 세트(감사보고서)에서 문단형 항목을 잡는다."""
+    """제목형 항목이 없는 세트(감사보고서)에서 문단형 항목을 잡는다.
+
+    문단 머리 번호(_PARA_NO)와 문단 중간 번호(_PARA_NO_MID)는 신호의
+    세기가 다르므로 서로 다른 규칙을 쓴다. 문단 머리는 그 문단 자체가
+    그 번호로 시작한다는 위치 신호가 강해 그대로 받아준다(번호가
+    last_no보다 작지만 않으면 된다). 문단 중간 번호는 신호가 약하다 —
+    '…다음과 같습니다. 30. 반도체 부문 설명입니다.'처럼 흔한 산문 속
+    번호 매긴 목록도 문장 끝 '다.' 뒤에 오면 주석 항목과 똑같이
+    매치된다. 주석 항목은 번호가 끊기지 않고 이어지므로(…24. …25.
+    …) 문단 중간 번호는 '바로 다음 항목 번호(last_no+1)'일 때만
+    받아준다 — 그렇지 않으면 산문 속 목록 번호를 주석 항목으로 잘못
+    등록해 last_no를 오염시키고, 그 번호가 엉뚱한 문단에 링크될 뿐
+    아니라 그 뒤에 오는 진짜 항목들까지 번호가 안 이어진다는 이유로
+    못 잡게 만든다(오조회와 등록 실패가 동시에 난다).
+    """
     tables = _table_spans(html)
     last_no = 0
     for m in _BLOCK.finditer(html):
@@ -228,11 +242,16 @@ def _index_paragraph_items(html, note_set):
         if _in_spans(m.start(), tables):      # 표 안 문단은 항목이 아니다
             continue
         text = _text_of(m.group(4))
-        nos = [int(x) for x in _PARA_NO.findall(text)]
-        nos += [int(x) for x in _PARA_NO_MID.findall(text)]
+        head_nos = [int(x) for x in _PARA_NO.findall(text)]
+        mid_nos = [int(x) for x in _PARA_NO_MID.findall(text)]
         known = note_set.numbers
-        for no in sorted(nos):
+        for no in sorted(head_nos):
             if no < last_no or no in known:
+                continue
+            last_no = no
+            note_set.pending.append((no, m.start() + 2))   # '<p' 다음
+        for no in sorted(mid_nos):
+            if no != last_no + 1 or no in known:
                 continue
             last_no = no
             note_set.pending.append((no, m.start() + 2))   # '<p' 다음

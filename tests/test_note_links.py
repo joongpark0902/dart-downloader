@@ -268,6 +268,43 @@ class ParagraphNumberSpaceBeforePeriodTest(unittest.TestCase):
                           "'다. 25.'처럼 공백을 두고 이어지는 항목이 등록되지 않았다")
 
 
+class ParagraphNumberMidSentenceListNotRegisteredTest(unittest.TestCase):
+    """_PARA_NO_MID의 공백 허용(위 테스트)이 만든 부작용을 막는다 — 산문
+    속 번호 매긴 목록('…다음과 같습니다. 30. 반도체 부문 설명입니다.')도
+    문장 끝 '다.' 뒤에 오므로 진짜 주석 항목과 똑같이 매치된다. 이 30은
+    last_no+1(2)이 아니므로 등록되면 안 된다 — 등록되면 last_no가
+    오염돼 그 뒤에 오는 진짜 2번·3번 항목이 통째로 안 잡힌다."""
+
+    HTML = (
+        '<h3>주석</h3>'
+        '<p>1. 회사의 개요 당사의 사업부문은 다음과 같습니다. 30. 반도체'
+        ' 부문 설명입니다.</p>'
+        '<p>2. 중요한 회계정책 내용입니다.</p><p>3. 재고자산 내용입니다.</p>'
+        '<p>참고: 주석 2 와 주석 3 와 주석 30 참조.</p>'
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = note_links.add_note_links(cls.HTML)
+
+    def test_prose_list_number_does_not_register(self):
+        self.assertNotIn('id="nt0_30"', self.html)
+
+    def test_reference_to_prose_number_stays_unlinked(self):
+        m = re.search(r"참고: 주석(.*?)참조\.", self.html)
+        self.assertIsNotNone(m)
+        self.assertIn("주석 30", m.group(0))
+        self.assertNotIn('href="#nt0_30"', m.group(0))
+
+    def test_following_real_items_still_register_and_resolve(self):
+        """30이 last_no를 오염시키지 않아야 뒤이은 진짜 2번·3번 항목이
+        정상 등록되고 링크된다(수정 전엔 30이 먼저 last_no=1을 30으로
+        끌어올려 2·3이 '역행'으로 보여 통째로 등록에 실패했다)."""
+        m = re.search(r"참고: 주석(.*?)참조\.", self.html)
+        self.assertIsNotNone(m)
+        self.assertEqual([("nt0_2", "2"), ("nt0_3", "3")], LINK.findall(m.group(0)))
+
+
 class DigitLedSeparatorTest(unittest.TestCase):
     """숫자로 시작하지만 번호 항목이 아닌 구분 제목('6 대 매 출 처 현황'처럼
     letter-spacing된 제목)도 세트를 닫아야 한다.
