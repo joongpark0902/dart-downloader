@@ -9,6 +9,7 @@ import threading
 import customtkinter as ctk
 
 from financials import get_audit_opinion_3y
+from ui_theme import TABLE_CELL_BG_TRANSPARENT_SCROLL, table_cell
 
 TITLE = "감사"
 SCOPE = "3y"
@@ -67,13 +68,14 @@ def render(ctx, state, data=None):
             font=bold, text_color="white"
         ).grid(row=ri * 6, column=0, padx=8, pady=(12 if ri else 4, 2), sticky="w")
 
-        # 감사인·의견 한 줄
+        # 감사인·의견 한 줄 (표 데이터 셀 → tk.Label; ui_theme.table_cell 참고)
         opinion_color = "white" if "적정" in row["감사의견"] else "#e05252"
-        ctk.CTkLabel(
+        table_cell(
             ctx.content,
-            text=f"감사인: {row['감사인']}   |   감사의견: {row['감사의견']}",
-            text_color=opinion_color,
-        ).grid(row=ri * 6 + 1, column=0, padx=16, pady=2, sticky="w")
+            f"감사인: {row['감사인']}   |   감사의견: {row['감사의견']}",
+            bg=TABLE_CELL_BG_TRANSPARENT_SCROLL, fg=opinion_color, anchor="w",
+            row=ri * 6 + 1, column=0, padx=16, pady=2,
+        )
 
         # 강조사항
         ctk.CTkLabel(ctx.content, text="▸ 강조사항",

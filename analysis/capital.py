@@ -9,6 +9,7 @@ import threading
 import customtkinter as ctk
 
 from financials import get_capital_changes_3y
+from ui_theme import TABLE_CELL_BG_TRANSPARENT_SCROLL, table_cell
 
 TITLE = "자본변동"
 SCOPE = "3y"
@@ -96,9 +97,13 @@ def render(ctx, state, data=None):
             ctk.CTkFrame(sub, height=1, fg_color="gray40").grid(
                 row=1, column=0, columnspan=len(hdrs), sticky="ew", pady=1)
             for ri, item in enumerate(issu):
-                for ci, (key, w) in enumerate(zip(keys, wids)):
-                    ctk.CTkLabel(sub, text=item.get(key, "-"), width=w,
-                                 anchor="w").grid(row=ri + 2, column=ci, padx=4, pady=3)
+                for ci, key in enumerate(keys):
+                    # 표 데이터 셀 → tk.Label (열 폭은 위 헤더가 이미 잡아 둔다)
+                    table_cell(
+                        sub, item.get(key, "-"),
+                        bg=TABLE_CELL_BG_TRANSPARENT_SCROLL, anchor="w",
+                        row=ri + 2, column=ci, padx=4, pady=3,
+                    )
 
         # ▸ 자기주식
         ctk.CTkLabel(ctx.content, text="▸ 자기주식 취득·처분",
@@ -119,10 +124,14 @@ def render(ctx, state, data=None):
             ctk.CTkFrame(sub2, height=1, fg_color="gray40").grid(
                 row=1, column=0, columnspan=len(hdrs2), sticky="ew", pady=1)
             for ri, item in enumerate(treas):
-                for ci, (key, w) in enumerate(zip(keys2, wids2)):
+                for ci, key in enumerate(keys2):
                     anchor = "w" if ci == 0 else "e"
-                    ctk.CTkLabel(sub2, text=item.get(key, "-"), width=w,
-                                 anchor=anchor).grid(row=ri + 2, column=ci, padx=4, pady=3)
+                    # 표 데이터 셀 → tk.Label (열 폭은 위 헤더가 이미 잡아 둔다)
+                    table_cell(
+                        sub2, item.get(key, "-"),
+                        bg=TABLE_CELL_BG_TRANSPARENT_SCROLL, anchor=anchor,
+                        row=ri + 2, column=ci, padx=4, pady=3,
+                    )
 
         # 연도 사이 구분선
         if yi < len(data) - 1:

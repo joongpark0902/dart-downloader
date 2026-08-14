@@ -9,6 +9,7 @@ import threading
 import customtkinter as ctk
 
 from financials import get_major_shareholder
+from ui_theme import TABLE_CELL_BG_TRANSPARENT_SCROLL, table_cell
 
 TITLE = "최대주주"
 SCOPE = "1y"
@@ -80,7 +81,6 @@ def render(ctx, state, data=None, year=None):
     )
 
     anchors = ["w", "w", "w", "e", "e"]
-    widths  = [180, 100, 90, 130, 90]
     grid_row = 2
     prev_is_detail = False
     for row in data:
@@ -101,10 +101,11 @@ def render(ctx, state, data=None, year=None):
             f"{row['기말주식수']:,}" if row["기말주식수"] is not None else "-",
             f"{row['지분율']:.2f}%" if row["지분율"] is not None else "-",
         ]
-        for ci, (val, anc, wd) in enumerate(zip(vals, anchors, widths)):
-            ctk.CTkLabel(f, text=val, text_color=color,
-                         width=wd, anchor=anc).grid(
-                row=grid_row, column=ci, padx=4, pady=3
+        for ci, (val, anc) in enumerate(zip(vals, anchors)):
+            # 표 데이터 셀 → tk.Label (열 폭은 위 헤더가 이미 잡아 둔다)
+            table_cell(
+                f, val, bg=TABLE_CELL_BG_TRANSPARENT_SCROLL, fg=color, anchor=anc,
+                row=grid_row, column=ci, padx=4, pady=3,
             )
         prev_is_detail = not is_total
         grid_row += 1

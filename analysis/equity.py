@@ -9,7 +9,7 @@ import threading
 import customtkinter as ctk
 
 from financials import get_equity_investments
-from ui_theme import fmt_val
+from ui_theme import TABLE_CELL_BG_DEFAULT_SCROLL, fmt_val, table_cell
 
 TITLE = "타법인출자"
 SCOPE = "1y"
@@ -111,10 +111,10 @@ def render(ctx, state, data=None, year=None, corp_name=""):
             (bv_s,           "e", bv_c),
         ]
         for ci, (text, anchor, color) in enumerate(cells):
-            ctk.CTkLabel(scroll, text=text, text_color=color,
-                         width=COL_W[ci], anchor=anchor).grid(
-                row=row_idx, column=ci,
-                padx=(0 if ci else 4, 4), pady=2, sticky=anchor
+            # 표 데이터 셀 → tk.Label (열 폭은 위 헤더가 이미 잡아 둔다)
+            table_cell(
+                scroll, text, bg=TABLE_CELL_BG_DEFAULT_SCROLL, fg=color, anchor=anchor,
+                row=row_idx, column=ci, padx=(0 if ci else 4, 4), pady=2,
             )
 
 
