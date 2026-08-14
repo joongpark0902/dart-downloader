@@ -8,8 +8,24 @@ import threading
 
 import customtkinter as ctk
 
+import ui_theme
 from financials import get_equity_investments
-from ui_theme import TABLE_CELL_BG_DEFAULT_SCROLL, fmt_val, table_cell
+from ui_theme import (
+    ACCENT,
+    NEGATIVE,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
+    fmt_val,
+    table_cell,
+    table_header,
+    table_separator,
+    zebra_bg,
+)
+
+# 지분율 구간별 강조색. 자회사(50%↑)는 앱 강조색(ACCENT)을, 관계사(20%↑)는
+# 흰 배경에서도 또렷이 읽히는 초록을 쓴다 — 다크 테마 때의 파스텔
+# "#63B3ED"/"#68D391"은 흰 배경 위에서는 대비가 부족해 그대로 못 쓴다.
+_AFFILIATE_GREEN = "#1E9E58"
 
 TITLE = "타법인출자"
 SCOPE = "1y"
@@ -50,19 +66,19 @@ def render(ctx, state, data=None, year=None, corp_name=""):
     if state == "initial":
         ctk.CTkLabel(ctx.content,
                      text="회사를 선택하면 출자 현황이 표시됩니다.",
-                     text_color="gray").grid(row=0, column=0)
+                     text_color=TEXT_SECONDARY).grid(row=0, column=0)
         return
     if state == "loading":
         ctk.CTkLabel(ctx.content,
-                     text="불러오는 중...", text_color="gray").grid(row=0, column=0)
+                     text="불러오는 중...", text_color=TEXT_SECONDARY).grid(row=0, column=0)
         return
     if state == "error":
         ctk.CTkLabel(ctx.content,
-                     text="데이터를 불러오지 못했습니다.", text_color="#FF6B6B").grid(row=0, column=0)
+                     text="데이터를 불러오지 못했습니다.", text_color=NEGATIVE).grid(row=0, column=0)
         return
     if not data:
         ctk.CTkLabel(ctx.content,
-                     text="출자 내역이 없습니다.", text_color="gray").grid(row=0, column=0)
+                     text="출자 내역이 없습니다.", text_color=TEXT_SECONDARY).grid(row=0, column=0)
         return
 
     # ── 정보 헤더 ──
@@ -70,10 +86,13 @@ def render(ctx, state, data=None, year=None, corp_name=""):
     info_frame.grid(row=0, column=0, sticky="ew", padx=8, pady=(4, 0))
     ctk.CTkLabel(info_frame,
                  text=f"총 {len(data)}건  ({year}년 기준)",
-                 text_color="gray70").pack(side="left")
+                 text_color=TEXT_SECONDARY).pack(side="left")
 
     # ── 스크롤 테이블 ──
-    scroll = ctk.CTkScrollableFrame(ctx.content)
+    # (다른 세 스크롤 탭과 배경 톤을 맞춘다 — ui_theme.ScrollFrame은 기본
+    # SURFACE로 칠해져 CTkScrollableFrame 기본값("gray86")과 달리 이 탭만
+    # 배경이 살짝 어두워 보이던 문제가 사라진다.)
+    scroll = ui_theme.ScrollFrame(ctx.content)
     scroll.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
     ctx.content.grid_rowconfigure(1, weight=1)
 
@@ -83,37 +102,35 @@ def render(ctx, state, data=None, year=None, corp_name=""):
     # 헤더 행
     for ci, (h, w) in enumerate(zip(HEADERS, COL_W)):
         anchor = "w" if ci == 0 else "e"
-        ctk.CTkLabel(scroll, text=h, font=ctk.CTkFont(weight="bold"),
-                     width=w, anchor=anchor).grid(
-            row=0, column=ci, padx=(0 if ci else 4, 4), pady=4, sticky=anchor
-        )
+        table_header(scroll, h, width=w, anchor=anchor,
+                     row=0, column=ci, padx=(0 if ci else 4, 4), pady=4)
 
-    sep = ctk.CTkFrame(scroll, height=1, fg_color="gray40")
-    sep.grid(row=1, column=0, columnspan=4, sticky="ew", pady=2)
+    table_separator(scroll, row=1, column=0, columnspan=4, pady=2)
 
     def _pct_color(pct):
-        if pct is None:  return "gray50"
-        if pct >= 50:    return "#63B3ED"   # 자회사 — 파랑
-        if pct >= 20:    return "#68D391"   # 관계사 — 초록
-        return "gray70"                      # 기타
+        if pct is None:  return TEXT_SECONDARY
+        if pct >= 50:    return ACCENT            # 자회사
+        if pct >= 20:    return _AFFILIATE_GREEN   # 관계사
+        return TEXT_SECONDARY                      # 기타
 
     for ri, row in enumerate(data):
         pct   = row["지분율"]
         bv    = row["기말장부가액"]
         pct_s = f"{pct:.1f}%" if pct is not None else "N/A"
-        bv_s, bv_c = fmt_val(bv) if bv is not None else ("N/A", "gray50")
+        bv_s, bv_c = fmt_val(bv) if bv is not None else ("N/A", TEXT_SECONDARY)
         row_idx = ri + 2
+        bg = zebra_bg(ri)
 
         cells = [
-            (row["법인명"],   "w", "white"),
-            (row["최초취득일"], "e", "gray70"),
+            (row["법인명"],   "w", TEXT_PRIMARY),
+            (row["최초취득일"], "e", TEXT_SECONDARY),
             (pct_s,          "e", _pct_color(pct)),
             (bv_s,           "e", bv_c),
         ]
         for ci, (text, anchor, color) in enumerate(cells):
             # 표 데이터 셀 → tk.Label (열 폭은 위 헤더가 이미 잡아 둔다)
             table_cell(
-                scroll, text, bg=TABLE_CELL_BG_DEFAULT_SCROLL, fg=color, anchor=anchor,
+                scroll, text, bg=bg, fg=color, anchor=anchor,
                 row=row_idx, column=ci, padx=(0 if ci else 4, 4), pady=2,
             )
 

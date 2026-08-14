@@ -8,8 +8,17 @@ import threading
 
 import customtkinter as ctk
 
+import ui_theme
 from financials import get_major_shareholder
-from ui_theme import TABLE_CELL_BG_TRANSPARENT_SCROLL, table_cell
+from ui_theme import (
+    NEGATIVE,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
+    table_cell,
+    table_header,
+    table_separator,
+    zebra_bg,
+)
 
 TITLE = "최대주주"
 SCOPE = "1y"
@@ -34,7 +43,7 @@ def build(parent, app):
     )
     title_label.grid(row=0, column=0, padx=12, pady=(10, 4), sticky="w")
 
-    content = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+    content = ui_theme.ScrollFrame(parent)
     content.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
     content.grid_columnconfigure(0, weight=1)
 
@@ -47,9 +56,9 @@ def render(ctx, state, data=None, year=None):
         w.destroy()
 
     msgs = {
-        "initial": ("회사를 선택하면 최대주주 정보가 표시됩니다.", "gray"),
-        "loading": ("불러오는 중...", "gray"),
-        "error":   ("데이터를 가져오지 못했습니다.", "#e05252"),
+        "initial": ("회사를 선택하면 최대주주 정보가 표시됩니다.", TEXT_SECONDARY),
+        "loading": ("불러오는 중...", TEXT_SECONDARY),
+        "error":   ("데이터를 가져오지 못했습니다.", NEGATIVE),
     }
     if state in msgs:
         text, color = msgs[state]
@@ -60,7 +69,7 @@ def render(ctx, state, data=None, year=None):
 
     if not data:
         ctk.CTkLabel(ctx.content,
-                     text="최대주주 정보 없음", text_color="gray").grid(
+                     text="최대주주 정보 없음", text_color=TEXT_SECONDARY).grid(
             row=0, column=0, padx=8, pady=8
         )
         return
@@ -68,32 +77,26 @@ def render(ctx, state, data=None, year=None):
     f = ctk.CTkFrame(ctx.content, fg_color="transparent")
     f.grid(row=0, column=0, sticky="nw", padx=8, pady=8)
 
-    bold = ctk.CTkFont(weight="bold")
     headers = [("주주명", 180, "w"), ("관계", 100, "w"),
                ("주식종류", 90, "w"), ("기말주식수", 130, "e"), ("지분율(%)", 90, "e")]
     for ci, (h, w, anchor) in enumerate(headers):
-        ctk.CTkLabel(f, text=h, font=bold, width=w, anchor=anchor).grid(
-            row=0, column=ci, padx=4, pady=4
-        )
+        table_header(f, h, width=w, anchor=anchor, row=0, column=ci, padx=4, pady=4)
 
-    ctk.CTkFrame(f, height=1, fg_color="gray40").grid(
-        row=1, column=0, columnspan=len(headers), sticky="ew", pady=2
-    )
+    table_separator(f, row=1, column=0, columnspan=len(headers), pady=2)
 
     anchors = ["w", "w", "w", "e", "e"]
     grid_row = 2
     prev_is_detail = False
+    data_row_idx = 0   # 줄무늬는 실제 데이터 행 기준으로만 센다(구분선은 안 셈)
     for row in data:
         is_total = row["주주명"] == "계"
         # 합계 행 앞에 구분선
         if is_total and prev_is_detail:
-            ctk.CTkFrame(f, height=1, fg_color="gray30").grid(
-                row=grid_row, column=0, columnspan=len(headers),
-                sticky="ew", pady=2
-            )
+            table_separator(f, row=grid_row, column=0, columnspan=len(headers), pady=2)
             grid_row += 1
-        color = ("white" if row["관계"] == "최대주주"
-                 else "gray50" if is_total else "gray80")
+        # 합계 행은 흐리게, 그 외(최대주주 포함 모든 상세 행)는 본문 진하기로.
+        color = TEXT_SECONDARY if is_total else TEXT_PRIMARY
+        bg = zebra_bg(data_row_idx)
         vals = [
             row["주주명"],
             row["관계"],
@@ -104,11 +107,12 @@ def render(ctx, state, data=None, year=None):
         for ci, (val, anc) in enumerate(zip(vals, anchors)):
             # 표 데이터 셀 → tk.Label (열 폭은 위 헤더가 이미 잡아 둔다)
             table_cell(
-                f, val, bg=TABLE_CELL_BG_TRANSPARENT_SCROLL, fg=color, anchor=anc,
+                f, val, bg=bg, fg=color, anchor=anc,
                 row=grid_row, column=ci, padx=4, pady=3,
             )
         prev_is_detail = not is_total
         grid_row += 1
+        data_row_idx += 1
 
 
 def load(app, ctx):

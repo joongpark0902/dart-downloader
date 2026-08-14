@@ -8,8 +8,16 @@ import threading
 
 import customtkinter as ctk
 
+import ui_theme
 from financials import get_capital_changes_3y
-from ui_theme import TABLE_CELL_BG_TRANSPARENT_SCROLL, table_cell
+from ui_theme import (
+    NEGATIVE,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
+    table_cell,
+    table_header,
+    table_separator,
+)
 
 TITLE = "자본변동"
 SCOPE = "3y"
@@ -34,7 +42,7 @@ def build(parent, app):
     )
     title_label.grid(row=0, column=0, padx=12, pady=(10, 4), sticky="w")
 
-    content = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+    content = ui_theme.ScrollFrame(parent)
     content.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
     content.grid_columnconfigure(0, weight=1)
 
@@ -47,9 +55,9 @@ def render(ctx, state, data=None):
         w.destroy()
 
     msgs = {
-        "initial": ("회사를 선택하면 자본변동 정보가 표시됩니다.", "gray"),
-        "loading": ("불러오는 중...", "gray"),
-        "error":   ("데이터를 가져오지 못했습니다.", "#e05252"),
+        "initial": ("회사를 선택하면 자본변동 정보가 표시됩니다.", TEXT_SECONDARY),
+        "loading": ("불러오는 중...", TEXT_SECONDARY),
+        "error":   ("데이터를 가져오지 못했습니다.", NEGATIVE),
     }
     if state in msgs:
         text, color = msgs[state]
@@ -74,69 +82,64 @@ def render(ctx, state, data=None):
         treas = year_data.get("자기주식", [])
 
         # 연도 헤더
-        ctk.CTkLabel(ctx.content, text=f"■ {yr}년도", font=bold).grid(
+        ctk.CTkLabel(ctx.content, text=f"■ {yr}년도", font=bold, text_color=TEXT_PRIMARY).grid(
             row=row_idx, column=0, padx=8, pady=(12 if yi else 4, 4), sticky="w"
         )
         row_idx += 1
 
         # ▸ 증자(감자)
         ctk.CTkLabel(ctx.content, text="▸ 증자(감자) 현황",
-                     text_color="gray60").grid(row=row_idx, column=0, padx=16, pady=(2, 0), sticky="w")
+                     text_color=TEXT_SECONDARY).grid(row=row_idx, column=0, padx=16, pady=(2, 0), sticky="w")
         row_idx += 1
         if not issu:
             ctk.CTkLabel(ctx.content, text="  해당사항 없음",
-                         text_color="gray60").grid(row=row_idx, column=0, padx=28, pady=2, sticky="w")
+                         text_color=TEXT_SECONDARY).grid(row=row_idx, column=0, padx=28, pady=2, sticky="w")
             row_idx += 1
         else:
             sub = ctk.CTkFrame(ctx.content, fg_color="transparent")
             sub.grid(row=row_idx, column=0, padx=24, pady=4, sticky="nw")
             row_idx += 1
             for ci, (h, w) in enumerate(zip(hdrs, wids)):
-                ctk.CTkLabel(sub, text=h, font=bold, width=w, anchor="w").grid(
-                    row=0, column=ci, padx=4, pady=2)
-            ctk.CTkFrame(sub, height=1, fg_color="gray40").grid(
-                row=1, column=0, columnspan=len(hdrs), sticky="ew", pady=1)
+                table_header(sub, h, width=w, row=0, column=ci, padx=4, pady=2)
+            table_separator(sub, row=1, column=0, columnspan=len(hdrs), pady=1)
             for ri, item in enumerate(issu):
                 for ci, key in enumerate(keys):
                     # 표 데이터 셀 → tk.Label (열 폭은 위 헤더가 이미 잡아 둔다)
                     table_cell(
                         sub, item.get(key, "-"),
-                        bg=TABLE_CELL_BG_TRANSPARENT_SCROLL, anchor="w",
+                        bg=ui_theme.zebra_bg(ri), anchor="w",
                         row=ri + 2, column=ci, padx=4, pady=3,
                     )
 
         # ▸ 자기주식
         ctk.CTkLabel(ctx.content, text="▸ 자기주식 취득·처분",
-                     text_color="gray60").grid(row=row_idx, column=0, padx=16, pady=(6, 0), sticky="w")
+                     text_color=TEXT_SECONDARY).grid(row=row_idx, column=0, padx=16, pady=(6, 0), sticky="w")
         row_idx += 1
         if not treas:
             ctk.CTkLabel(ctx.content, text="  해당사항 없음",
-                         text_color="gray60").grid(row=row_idx, column=0, padx=28, pady=2, sticky="w")
+                         text_color=TEXT_SECONDARY).grid(row=row_idx, column=0, padx=28, pady=2, sticky="w")
             row_idx += 1
         else:
             sub2 = ctk.CTkFrame(ctx.content, fg_color="transparent")
             sub2.grid(row=row_idx, column=0, padx=24, pady=4, sticky="nw")
             row_idx += 1
             for ci, (h, w) in enumerate(zip(hdrs2, wids2)):
-                ctk.CTkLabel(sub2, text=h, font=bold, width=w,
-                             anchor=("w" if ci == 0 else "e")).grid(
-                    row=0, column=ci, padx=4, pady=2)
-            ctk.CTkFrame(sub2, height=1, fg_color="gray40").grid(
-                row=1, column=0, columnspan=len(hdrs2), sticky="ew", pady=1)
+                anchor = "w" if ci == 0 else "e"
+                table_header(sub2, h, width=w, anchor=anchor, row=0, column=ci, padx=4, pady=2)
+            table_separator(sub2, row=1, column=0, columnspan=len(hdrs2), pady=1)
             for ri, item in enumerate(treas):
                 for ci, key in enumerate(keys2):
                     anchor = "w" if ci == 0 else "e"
                     # 표 데이터 셀 → tk.Label (열 폭은 위 헤더가 이미 잡아 둔다)
                     table_cell(
                         sub2, item.get(key, "-"),
-                        bg=TABLE_CELL_BG_TRANSPARENT_SCROLL, anchor=anchor,
+                        bg=ui_theme.zebra_bg(ri), anchor=anchor,
                         row=ri + 2, column=ci, padx=4, pady=3,
                     )
 
         # 연도 사이 구분선
         if yi < len(data) - 1:
-            ctk.CTkFrame(ctx.content, height=1, fg_color="gray30").grid(
-                row=row_idx, column=0, sticky="ew", padx=8, pady=8)
+            table_separator(ctx.content, row=row_idx, column=0, padx=8, pady=8)
             row_idx += 1
 
     ctx.content.grid_columnconfigure(0, weight=1)

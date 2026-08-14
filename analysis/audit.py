@@ -8,8 +8,9 @@ import threading
 
 import customtkinter as ctk
 
+import ui_theme
 from financials import get_audit_opinion_3y
-from ui_theme import TABLE_CELL_BG_TRANSPARENT_SCROLL, table_cell
+from ui_theme import NEGATIVE, SURFACE, TEXT_PRIMARY, TEXT_SECONDARY, table_cell
 
 TITLE = "감사"
 SCOPE = "3y"
@@ -34,7 +35,7 @@ def build(parent, app):
     )
     title_label.grid(row=0, column=0, padx=12, pady=(10, 4), sticky="w")
 
-    content = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+    content = ui_theme.ScrollFrame(parent)
     content.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
     content.grid_columnconfigure(0, weight=1)
 
@@ -47,9 +48,9 @@ def render(ctx, state, data=None):
         w.destroy()
 
     msgs = {
-        "initial": ("회사를 선택하면 감사 정보가 표시됩니다.", "gray"),
-        "loading": ("불러오는 중...", "gray"),
-        "error":   ("데이터를 가져오지 못했습니다.", "#e05252"),
+        "initial": ("회사를 선택하면 감사 정보가 표시됩니다.", TEXT_SECONDARY),
+        "loading": ("불러오는 중...", TEXT_SECONDARY),
+        "error":   ("데이터를 가져오지 못했습니다.", NEGATIVE),
     }
     if state in msgs:
         text, color = msgs[state]
@@ -65,26 +66,26 @@ def render(ctx, state, data=None):
         ctk.CTkLabel(
             ctx.content,
             text=f"■ {yr}년도",
-            font=bold, text_color="white"
+            font=bold, text_color=TEXT_PRIMARY
         ).grid(row=ri * 6, column=0, padx=8, pady=(12 if ri else 4, 2), sticky="w")
 
         # 감사인·의견 한 줄 (표 데이터 셀 → tk.Label; ui_theme.table_cell 참고)
-        opinion_color = "white" if "적정" in row["감사의견"] else "#e05252"
+        opinion_color = TEXT_PRIMARY if "적정" in row["감사의견"] else NEGATIVE
         table_cell(
             ctx.content,
             f"감사인: {row['감사인']}   |   감사의견: {row['감사의견']}",
-            bg=TABLE_CELL_BG_TRANSPARENT_SCROLL, fg=opinion_color, anchor="w",
+            bg=SURFACE, fg=opinion_color, anchor="w",
             row=ri * 6 + 1, column=0, padx=16, pady=2,
         )
 
         # 강조사항
         ctk.CTkLabel(ctx.content, text="▸ 강조사항",
-                     text_color="gray70").grid(
+                     text_color=TEXT_SECONDARY).grid(
             row=ri * 6 + 2, column=0, padx=16, pady=(6, 0), sticky="w"
         )
         ctk.CTkTextbox(
             ctx.content, height=50, wrap="word",
-            fg_color="#2a2a2a", border_width=0,
+            fg_color=ui_theme.PANEL_BG, text_color=TEXT_PRIMARY, border_width=0,
         ).grid(row=ri * 6 + 3, column=0, padx=24, pady=(0, 4), sticky="ew")
         tb_emp = ctx.content.grid_slaves(row=ri * 6 + 3, column=0)[0]
         tb_emp.insert("end", row["강조사항"])
@@ -92,12 +93,12 @@ def render(ctx, state, data=None):
 
         # 핵심감사사항
         ctk.CTkLabel(ctx.content, text="▸ 핵심감사사항",
-                     text_color="gray70").grid(
+                     text_color=TEXT_SECONDARY).grid(
             row=ri * 6 + 4, column=0, padx=16, pady=(6, 0), sticky="w"
         )
         tb_core = ctk.CTkTextbox(
             ctx.content, height=110, wrap="word",
-            fg_color="#2a2a2a", border_width=0,
+            fg_color=ui_theme.PANEL_BG, text_color=TEXT_PRIMARY, border_width=0,
         )
         tb_core.grid(row=ri * 6 + 5, column=0, padx=24, pady=(0, 4), sticky="ew")
         tb_core.insert("end", row["핵심감사사항"])

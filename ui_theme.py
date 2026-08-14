@@ -1,5 +1,6 @@
 """GUI 공통 테마와 표시 포맷."""
 import tkinter as tk
+import tkinter.ttk as ttk
 
 import customtkinter as ctk
 
@@ -110,18 +111,13 @@ TABLE_CELL_FONT = ("Segoe UI", -13, "normal roman  ")
 # 정확히 같아진다(cget()으로 실측).
 TABLE_CELL_DEFAULT_FG = "gray10"
 
-# CTkScrollableFrame(fg_color="transparent")로 만든 스크롤 영역 안은 상위
-# 프레임 색이 그대로 비쳐 보인다 — analysis/audit.py, analysis/capital.py,
-# analysis/shareholder.py가 이 경우다(스크롤 프레임 자체와 그 안에 얹은
-# 투명 서브프레임 모두 동일하게 이 색으로 귀결된다). 이 상위 프레임은
-# analysis_tab.py가 CTkTabview(fg_color=SURFACE)로 명시한 탭 내용 배경이라
-# SURFACE와 정확히 같다(cget()으로 실측).
-TABLE_CELL_BG_TRANSPARENT_SCROLL = SURFACE
-
-# CTkScrollableFrame을 fg_color 지정 없이(테마 기본값) 만들면 스스로 색을
-# 칠한다 — analysis/equity.py의 스크롤 표가 이 경우다. 라이트 모드 실측값은
-# "gray86"(CTkFrame 기본 fg_color의 라이트 쪽)이다.
-TABLE_CELL_BG_DEFAULT_SCROLL = "gray86"
+# (예전엔 여기에 TABLE_CELL_BG_TRANSPARENT_SCROLL / TABLE_CELL_BG_DEFAULT_SCROLL
+# 두 상수가 있었다 — CTkScrollableFrame을 만드는 방식(fg_color="transparent"로
+# 만드는지, 기본값으로 만드는지)에 따라 스크롤 표 배경이 SURFACE와 "gray86"
+# 두 가지로 갈라졌기 때문이다(analysis/equity.py만 후자라 다른 3개 탭과
+# 표 배경 톤이 살짝 달랐다). 아래 ScrollFrame으로 스크롤 컨테이너를 직접
+# 구현하면서 배경을 SURFACE 하나로 통일했으므로 이제 이 구분이 필요 없다
+# — 표 셀은 그냥 SURFACE(또는 zebra_bg가 주는 SURFACE/ROW_STRIPE)를 쓴다.)
 
 # CTkLabel의 기본 height(모든 셀 호출부가 height= 를 안 주므로 실제로 쓰인
 # 값). tk.Label은 같은 텍스트라도 자기 폰트 높이만큼만 차지해 그대로 두면
@@ -174,11 +170,18 @@ TABLE_HEADER_BG = PANEL_BG
 TABLE_HEADER_FONT = ("Segoe UI", -11)
 
 
-def table_header(parent, text, *, anchor="w", **grid_kwargs):
-    """표 열 헤더 한 칸을 CTkLabel로 만들어 grid까지 배치하고 돌려준다."""
+def table_header(parent, text, *, anchor="w", width=None, **grid_kwargs):
+    """표 열 헤더 한 칸을 CTkLabel로 만들어 grid까지 배치하고 돌려준다.
+
+    width를 주면 열 폭을 픽셀로 고정한다(표 데이터 셀은 대개 폭을 직접
+    잡지 않고 같은 열의 헤더가 잡아 준 폭 안에서 sticky=anchor로 정렬만
+    맞춘다 — table_cell 참고). grid()는 width를 모르므로 CTkLabel
+    생성자에만 넘기고 grid_kwargs에는 안 들어가게 분리한다.
+    """
+    extra = {} if width is None else {"width": width}
     lbl = ctk.CTkLabel(
         parent, text=text, fg_color=TABLE_HEADER_BG, text_color=TEXT_SECONDARY,
-        font=TABLE_HEADER_FONT, anchor=anchor, corner_radius=0,
+        font=TABLE_HEADER_FONT, anchor=anchor, corner_radius=0, **extra,
     )
     lbl.grid(sticky=anchor, **grid_kwargs)
     return lbl
@@ -211,6 +214,153 @@ def table_separator(parent, **grid_kwargs):
         sep.configure(height=1)
     sep.grid(**grid_kwargs)
     return sep
+
+
+# ── 스크롤 컨테이너: CTkScrollableFrame 대체 (성능) ─────────────────────────
+#
+# 실측(이 PC 기준, 탭 내용이 이미 그려진 상태에서 탭만 전환): 최대주주
+# (20행×5열) 833ms, 감사 382ms, 자본변동 260ms, 나머지도 200ms대. 표 셀을
+# tk.Label로 내려도(위 table_cell 참고) 이 비용은 그대로였다 — 프로파일러로
+# 잡아 보니 CTkScrollbar._draw()가 <Configure> 이벤트마다 다시 그려지는
+# 것이 원인이었다(스크롤바 하나가 매 전환마다 스스로를 다시 그리는데,
+# 그 비용이 표 크기에 비례해 늘어난다). CTkScrollableFrame 자체를 순수
+# tkinter로 다시 짠 아래 ScrollFrame으로 바꿔 이 비용을 없앤다.
+_SCROLLBAR_STYLE = "Light.Vertical.TScrollbar"
+_scrollbar_style_ready = False
+
+
+def _ensure_scrollbar_style():
+    """ttk 스크롤바 스타일을 앱 생애주기 동안 한 번만 등록한다.
+
+    Windows 기본 ttk 테마("vista"/"xpnative")는 스크롤바를 OS 네이티브
+    위젯으로 그려 background/troughcolor 같은 색 옵션을 대부분 무시한다
+    — 라이트 팔레트 색을 실제로 입히려면 색을 커스터마이즈할 수 있는
+    "clam" 테마로 바꿔야 한다. 이 앱에서 ttk 위젯은 이 스크롤바 하나뿐이라
+    (grep으로 확인) 전역 ttk 테마를 바꿔도 다른 위젯에 영향이 없다.
+    """
+    global _scrollbar_style_ready
+    if _scrollbar_style_ready:
+        return
+    style = ttk.Style()
+    style.theme_use("clam")
+    style.configure(
+        _SCROLLBAR_STYLE,
+        background=BORDER, troughcolor=SURFACE, bordercolor=SURFACE,
+        arrowcolor=TEXT_SECONDARY, relief="flat", arrowsize=13, width=12,
+    )
+    style.map(_SCROLLBAR_STYLE, background=[("active", TEXT_SECONDARY)])
+    _scrollbar_style_ready = True
+
+
+class ScrollFrame(tk.Frame):
+    """CTkScrollableFrame을 대신하는 순수 tkinter 세로 스크롤 컨테이너.
+
+    tk.Canvas 위에 내용 프레임을 얹고, 내용이 넘칠 때만 세로 스크롤바를
+    붙이는 표준 레시피다. 반환되는 객체 자신이 "내용을 담는 프레임"이다
+    — 지금까지 CTkScrollableFrame을 쓰던 곳과 똑같이 이 위에 자식 위젯을
+    만들고 grid()하면 된다(analysis/*.py의 render()들이 `ctx.content`를
+    그냥 부모 삼아 자식을 추가/파괴하는 기존 코드를 한 글자도 안 고쳐도
+    되게 하기 위한 설계다). 다만 이 프레임을 부모 위젯 안에 배치하는
+    grid() 호출만은, 실제로는 캔버스+스크롤바를 감싼 바깥 컨테이너
+    (self._outer)에 적용되도록 오버라이드했다.
+    """
+
+    def __init__(self, parent, bg=SURFACE, **kwargs):
+        _ensure_scrollbar_style()
+
+        self._outer = tk.Frame(parent, bg=bg, highlightthickness=0, bd=0)
+        self._outer.grid_columnconfigure(0, weight=1)
+        self._outer.grid_rowconfigure(0, weight=1)
+
+        self._canvas = tk.Canvas(self._outer, bg=bg, highlightthickness=0, bd=0)
+        self._canvas.grid(row=0, column=0, sticky="nsew")
+
+        self._vbar = ttk.Scrollbar(
+            self._outer, orient="vertical", command=self._canvas.yview,
+            style=_SCROLLBAR_STYLE,
+        )
+        self._vbar_visible = False
+        self._canvas.configure(yscrollcommand=self._vbar.set)
+
+        kwargs.setdefault("bg", bg)
+        super().__init__(self._canvas, **kwargs)
+        self._window_id = self._canvas.create_window((0, 0), window=self, anchor="nw")
+
+        self.bind("<Configure>", self._on_inner_configure)
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
+
+        # 마우스 휠: 포인터가 이 캔버스 위에 있는 동안만 전역으로 휠을
+        # 받고, 벗어나면 즉시 풀어준다 — 다른 스크롤 영역(다른 탭이나
+        # 좌측 패널 목록창) 위에서 휠을 굴렸을 때 이 컨테이너까지 같이
+        # 움직이는 사고를 막는다(전역 bind_all을 상시로 걸어 두는 것이
+        # 흔한 버그라 여기서는 Enter/Leave에 걸어 뒀다 뗐다 한다).
+        self._canvas.bind("<Enter>", self._on_canvas_enter)
+        self._canvas.bind("<Leave>", self._on_canvas_leave)
+
+    # ── 배치: 실제로는 바깥 컨테이너(캔버스+스크롤바)를 옮긴다 ──
+    def grid(self, **kwargs):
+        self._outer.grid(**kwargs)
+
+    def grid_forget(self):
+        self._outer.grid_forget()
+
+    def grid_remove(self):
+        self._outer.grid_remove()
+
+    # ── 내부 동작 ──
+    def _on_canvas_enter(self, _event=None):
+        self._canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _on_canvas_leave(self, _event=None):
+        self._canvas.unbind_all("<MouseWheel>")
+
+    def _on_mousewheel(self, event):
+        self._canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _bind_wheel(self, widget):
+        """자식 위젯 전체에도 같은 휠 핸들러를 개별 바인딩한다.
+
+        Enter/Leave 크로싱 이벤트는 캔버스 → 자식 위젯 경계를 넘어갈
+        때도 발생한다(부모/자식 전환도 하나의 크로싱으로 잡힌다) — 그래서
+        위 Enter/Leave만으로는 표 안 라벨 위에 커서가 있을 때 bind_all이
+        풀려 휠이 안 먹는 경우가 실측으로 확인됐다. 자식마다 직접 같은
+        핸들러를 걸어, 컨테이너 안 어느 위젯 위에 있든 이 스크롤 영역이
+        움직이게 한다(다른 컨테이너까지 같이 움직이지는 않는다 — 바인딩이
+        위젯별로 국한되어 있으므로).
+        """
+        widget.bind("<MouseWheel>", self._on_mousewheel)
+        for child in widget.winfo_children():
+            self._bind_wheel(child)
+
+    def _on_inner_configure(self, _event=None):
+        self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+        self._sync_scrollbar()
+        self._bind_wheel(self)
+
+    def _on_canvas_configure(self, event):
+        # 안쪽 프레임을 캔버스 폭에 맞춰 늘린다 — 그래야 오른쪽 정렬
+        # 셀(금액 열 등)이 진짜 표 가장자리에 붙는다.
+        self._canvas.itemconfigure(self._window_id, width=event.width)
+        self._sync_scrollbar()
+
+    def _sync_scrollbar(self):
+        """내용이 넘칠 때만 스크롤바를 붙이고, 아니면 뗀다.
+
+        grid()/grid_forget()는 표시 상태가 실제로 바뀔 때만 부른다
+        (self._vbar_visible로 판단). 무조건 매번 토글하면 스크롤바
+        유무가 캔버스 폭을 바꾸고, 그게 다시 <Configure>를 불러 폭이
+        바뀌고 또 유무 판단이 바뀌는 무한 루프(레이아웃 지터)에 빠진다.
+        """
+        self._canvas.update_idletasks()
+        bbox = self._canvas.bbox("all")
+        content_h = (bbox[3] - bbox[1]) if bbox else 0
+        need = content_h > self._canvas.winfo_height()
+        if need and not self._vbar_visible:
+            self._vbar.grid(row=0, column=1, sticky="ns")
+            self._vbar_visible = True
+        elif not need and self._vbar_visible:
+            self._vbar.grid_forget()
+            self._vbar_visible = False
 
 
 def fmt_val(val):
