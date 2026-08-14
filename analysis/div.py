@@ -9,7 +9,7 @@ import threading
 import customtkinter as ctk
 
 from financials import get_dividend_info_3y
-from ui_theme import fmt_div_val
+from ui_theme import NEGATIVE, TEXT_SECONDARY, fmt_div_val, table_header, table_separator
 
 TITLE = "배당"
 SCOPE = "3y"
@@ -52,15 +52,15 @@ def render(ctx, state, data=None, years=None):
     if state == "initial":
         ctk.CTkLabel(ctx.content,
                      text="회사를 선택하면 배당 데이터가 표시됩니다.",
-                     text_color="gray").grid(row=0, column=0)
+                     text_color=TEXT_SECONDARY).grid(row=0, column=0)
         return
     if state == "loading":
         ctk.CTkLabel(ctx.content,
-                     text="불러오는 중...", text_color="gray").grid(row=0, column=0)
+                     text="불러오는 중...", text_color=TEXT_SECONDARY).grid(row=0, column=0)
         return
     if state == "error":
         ctk.CTkLabel(ctx.content,
-                     text="데이터를 불러오지 못했습니다.", text_color="#FF6B6B").grid(row=0, column=0)
+                     text="데이터를 불러오지 못했습니다.", text_color=NEGATIVE).grid(row=0, column=0)
         return
 
     f = ctk.CTkFrame(ctx.content, fg_color="transparent")
@@ -69,14 +69,11 @@ def render(ctx, state, data=None, years=None):
     col_w = 130
 
     # 헤더
-    ctk.CTkLabel(f, text="항목", font=ctk.CTkFont(weight="bold"),
-                 width=160, anchor="w").grid(row=0, column=0, padx=(0, 8), pady=4, sticky="w")
+    table_header(f, "항목", width=160, row=0, column=0, padx=(0, 8), pady=4)
     for ci, yr in enumerate(years):
-        ctk.CTkLabel(f, text=f"{yr}년", font=ctk.CTkFont(weight="bold"),
-                     width=col_w, anchor="e").grid(row=0, column=ci+1, padx=4, pady=4)
+        table_header(f, f"{yr}년", width=col_w, anchor="e", row=0, column=ci+1, padx=4, pady=4)
 
-    sep = ctk.CTkFrame(f, height=1, fg_color="gray40")
-    sep.grid(row=1, column=0, columnspan=len(years)+1, sticky="ew", pady=2)
+    table_separator(f, row=1, column=0, columnspan=len(years)+1, pady=2)
 
     for ri, label in enumerate(_DIV_LABELS):
         ctk.CTkLabel(f, text=label, width=160, anchor="w").grid(

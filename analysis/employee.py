@@ -9,6 +9,7 @@ import threading
 import customtkinter as ctk
 
 from financials import get_employee_status
+from ui_theme import NEGATIVE, TEXT_PRIMARY, TEXT_SECONDARY, table_header, table_separator
 
 TITLE = "직원"
 SCOPE = "1y"
@@ -47,9 +48,9 @@ def render(ctx, state, data=None, year=None):
         w.destroy()
 
     msgs = {
-        "initial": ("회사를 선택하면 직원 정보가 표시됩니다.", "gray"),
-        "loading": ("불러오는 중...", "gray"),
-        "error":   ("데이터를 가져오지 못했습니다.", "#e05252"),
+        "initial": ("회사를 선택하면 직원 정보가 표시됩니다.", TEXT_SECONDARY),
+        "loading": ("불러오는 중...", TEXT_SECONDARY),
+        "error":   ("데이터를 가져오지 못했습니다.", NEGATIVE),
     }
     if state in msgs:
         text, color = msgs[state]
@@ -61,7 +62,6 @@ def render(ctx, state, data=None, year=None):
     f = ctk.CTkFrame(ctx.content, fg_color="transparent")
     f.grid(row=0, column=0, sticky="n", padx=8, pady=8)
 
-    bold  = ctk.CTkFont(weight="bold")
     label_w, val_w = 160, 140
 
     def _row(parent, r, label, *vals):
@@ -75,32 +75,25 @@ def render(ctx, state, data=None, year=None):
             )
 
     # 성별 헤더
-    ctk.CTkLabel(f, text="항목", font=bold, width=label_w, anchor="w").grid(
-        row=0, column=0, padx=(0, 12), pady=4
-    )
+    table_header(f, "항목", width=label_w, row=0, column=0, padx=(0, 12), pady=4)
     gender_names = [g["성별"] for g in data["성별"]]
     for ci, g in enumerate(gender_names):
-        ctk.CTkLabel(f, text=g, font=bold, width=val_w, anchor="e").grid(
-            row=0, column=ci + 1, padx=4, pady=4
-        )
-    ctk.CTkLabel(f, text="합계", font=bold, width=val_w, anchor="e").grid(
-        row=0, column=len(gender_names) + 1, padx=4, pady=4
-    )
+        table_header(f, g, width=val_w, anchor="e", row=0, column=ci + 1, padx=4, pady=4)
+    table_header(f, "합계", width=val_w, anchor="e",
+                 row=0, column=len(gender_names) + 1, padx=4, pady=4)
 
-    ctk.CTkFrame(f, height=1, fg_color="gray40").grid(
-        row=1, column=0, columnspan=len(gender_names) + 2, sticky="ew", pady=2
-    )
+    table_separator(f, row=1, column=0, columnspan=len(gender_names) + 2, pady=2)
 
     def _fmt_int(v):
-        return (f"{v:,}명", "white") if v is not None else ("-", "gray50")
+        return (f"{v:,}명", TEXT_PRIMARY) if v is not None else ("-", TEXT_SECONDARY)
 
     def _fmt_tenure(v):
-        return (f"{v}년", "white") if v is not None else ("-", "gray50")
+        return (f"{v}년", TEXT_PRIMARY) if v is not None else ("-", TEXT_SECONDARY)
 
     def _fmt_salary(v):
-        if v is None: return ("-", "gray50")
-        if v >= 100_000_000: return (f"{v/100_000_000:.1f}억원", "white")
-        return (f"{v:,}원", "white")
+        if v is None: return ("-", TEXT_SECONDARY)
+        if v >= 100_000_000: return (f"{v/100_000_000:.1f}억원", TEXT_PRIMARY)
+        return (f"{v:,}원", TEXT_PRIMARY)
 
     gd = data["성별"]
 
@@ -114,9 +107,7 @@ def render(ctx, state, data=None, year=None):
          *[_fmt_int(g["계약직"]) for g in gd],
          _fmt_int(data["계약직"]))
 
-    ctk.CTkFrame(f, height=1, fg_color="gray30").grid(
-        row=5, column=0, columnspan=len(gd) + 2, sticky="ew", pady=2
-    )
+    table_separator(f, row=5, column=0, columnspan=len(gd) + 2, pady=2)
 
     _row(f, 6, "평균근속연수",
          *[_fmt_tenure(g["평균근속연수"]) for g in gd],

@@ -17,7 +17,11 @@ from financials import (
     get_extended_financials_3y,
     get_key_financials_3y,
 )
-from ui_theme import fmt_val
+from ui_theme import NEGATIVE, TEXT_SECONDARY, fmt_val, table_header, table_separator
+
+# 라이트 팔레트에는 표준 warning색이 없어(NEGATIVE는 오류/음수 전용) 이
+# 탭 특유의 "지원 안 함" 안내에만 쓰는 호박색을 따로 둔다.
+_WARNING = "#B8720A"
 
 # 재무지표 탭 컨텍스트를 얻기 위해 모듈 자체를 import 한다.
 from analysis import ratio
@@ -63,23 +67,23 @@ def render(ctx, state, data=None, corp_name="", years=None):
     if state == "initial":
         ctk.CTkLabel(ctx.content,
                      text="회사를 선택하면 재무 데이터가 표시됩니다.",
-                     text_color="gray").grid(row=0, column=0)
+                     text_color=TEXT_SECONDARY).grid(row=0, column=0)
         return
 
     if state == "loading":
         ctk.CTkLabel(ctx.content,
-                     text="불러오는 중...", text_color="gray").grid(row=0, column=0)
+                     text="불러오는 중...", text_color=TEXT_SECONDARY).grid(row=0, column=0)
         return
 
     if state == "no_ofs":
         ctk.CTkLabel(ctx.content,
                      text="해당 회사는 별도 재무제표를 별도로 공시하지 않습니다.",
-                     text_color="orange").grid(row=0, column=0, padx=12, pady=12)
+                     text_color=_WARNING).grid(row=0, column=0, padx=12, pady=12)
         return
 
     if state == "error":
         ctk.CTkLabel(ctx.content,
-                     text="데이터를 불러오지 못했습니다.", text_color="#FF6B6B").grid(row=0, column=0)
+                     text="데이터를 불러오지 못했습니다.", text_color=NEGATIVE).grid(row=0, column=0)
         return
 
     # ── 전체 N/A 감지 → 비지원 안내 ──
@@ -95,7 +99,7 @@ def render(ctx, state, data=None, corp_name="", years=None):
         ctk.CTkLabel(
             outer,
             text="이 회사는 XBRL 재무데이터를 지원하지 않습니다 (비상장 외감법인 등)",
-            text_color="#FFA040",
+            text_color=_WARNING,
         ).grid(row=0, column=0, pady=(0, 10), sticky="w")
 
     # ── 표 그리기 ──
@@ -103,26 +107,20 @@ def render(ctx, state, data=None, corp_name="", years=None):
     f.grid(row=1, column=0, sticky="n")
 
     col_w = 110
-    row_h = 32
 
     # 헤더
-    ctk.CTkLabel(f, text="항목", font=ctk.CTkFont(weight="bold"),
-                 width=120, anchor="w").grid(row=0, column=0, padx=(0, 8), pady=4, sticky="w")
+    table_header(f, "항목", width=120, row=0, column=0, padx=(0, 8), pady=4)
     for ci, yr in enumerate(years):
-        ctk.CTkLabel(f, text=f"{yr}년", font=ctk.CTkFont(weight="bold"),
-                     width=col_w, anchor="e").grid(row=0, column=ci+1, padx=4, pady=4)
+        table_header(f, f"{yr}년", width=col_w, anchor="e", row=0, column=ci+1, padx=4, pady=4)
 
     # 구분선
-    sep = ctk.CTkFrame(f, height=1, fg_color="gray40")
-    sep.grid(row=1, column=0, columnspan=len(years)+1, sticky="ew", pady=2)
+    table_separator(f, row=1, column=0, columnspan=len(years)+1, pady=2)
 
     # 데이터 행
     for ri, label in enumerate(_FIN_LABELS):
         # 구분선: 자산총계 위
         if label == "자산총계":
-            sep2 = ctk.CTkFrame(f, height=1, fg_color="gray30")
-            sep2.grid(row=ri*2+2, column=0, columnspan=len(years)+1,
-                      sticky="ew", pady=2)
+            table_separator(f, row=ri*2+2, column=0, columnspan=len(years)+1, pady=2)
 
         row_idx = ri * 2 + 3 if label != "매출액" else ri * 2 + 2
 

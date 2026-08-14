@@ -35,9 +35,9 @@ class AnalysisPanel:
         # 기본값과 같은가"를 보고 탭 안쪽 톤을 자동으로 고르는데, 위에서
         # self.frame의 fg_color를 이미 PANEL_BG로 직접 지정했으므로 그 자동
         # 판단이 깨진다. 명시적으로 SURFACE(흰색)를 줘서 각 탭 내용 영역이
-        # macOS 표 배경처럼 흰 바탕이 되게 하고, ui_theme.
-        # TABLE_CELL_BG_TRANSPARENT_SCROLL(analysis/audit.py 등이 표 셀
-        # 배경으로 쓰는 값)도 이 SURFACE와 맞춰 둔다.
+        # macOS 표 배경처럼 흰 바탕이 되게 하고, ui_theme.ScrollFrame(
+        # analysis/audit.py 등이 만드는 스크롤 컨테이너)의 기본 배경도
+        # 이 SURFACE와 맞춰 둔다.
         self.tabview = ctk.CTkTabview(
             self.frame, fg_color=ui_theme.SURFACE, command=self._on_tab_change
         )
