@@ -33,6 +33,100 @@ def apply_theme():
     ctk.ThemeManager.theme["CTkFont"]["family"] = FONT_FAMILY
 
 
+def _rgb_hex_to_colorref(hex_color):
+    """"#RRGGBB" → Win32 COLORREF(0x00BBGGRR) 정수로 바꾼다.
+
+    COLORREF는 우리가 평소 쓰는 "#RRGGBB" 순서와 바이트 순서가 뒤집혀
+    있다(0x00BBGGRR) — 이 변환을 건너뛰고 정수를 그대로 넘기면 R과 B가
+    맞바뀐, 그럴듯하지만 틀린 색이 칠해진다(예: 파란 계열을 넣었는데
+    주황/빨강이 나오는 식). apply_titlebar_theme()에서만 쓴다.
+    """
+    hex_color = hex_color.lstrip("#")
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    return (b << 16) | (g << 8) | r
+
+
+def apply_titlebar_theme(window):
+    """네이티브 타이틀바를 라이트 팔레트 색으로 물들인다(Windows 11 22000+).
+
+    macOS 스타일 트래픽라이트 버튼(오버레이 창)을 새로 그리는 대신,
+    Windows 11의 DWM(Desktop Window Manager) API로 기존 네이티브
+    타이틀바의 캡션/텍스트/테두리 색만 바꿔서 창 아래 라이트 배경
+    (WINDOW_BG)과 이어져 보이게 한다 — 드래그·리사이즈·스냅·작업표시줄
+    프리뷰 같은 네이티브 동작은 전부 그대로 남는다(overrideredirect를
+    안 쓰므로).
+
+    이 함수는 성공 여부와 무관하게 절대 예외를 던지지 않는다: DWM 캡션
+    색 속성(DWMWA_CAPTION_COLOR 등)은 Windows 11 빌드 22000 이상에서만
+    존재한다 — Windows 10, 그보다 낮은 11 빌드, 또는 Windows가 아닌
+    플랫폼에서는 dwmapi 자체가 없거나 DwmSetWindowAttribute가 0이 아닌
+    HRESULT(실패)를 돌려주는데, 이 모든 경우를 조용히 무시하고 그냥
+    돌아온다 — 앱은 기본 타이틀바로 정상 실행된다.
+
+    winfo_id()가 돌려주는 건 (Windows tkinter에서는) 실제 최상위 창이
+    아니라 그 안의 자식 드로잉 서피스 HWND다 — 이 핸들을 그대로
+    DwmSetWindowAttribute에 넘기면 "핸들이 잘못되었습니다"
+    (invalid handle) OSError가 난다(직접 재현해 확인). 그래서
+    user32.GetAncestor(hwnd, GA_ROOT)로 캡션·테두리를 실제로 소유한
+    최상위 창 핸들을 한 번 더 구해서 그 핸들에 적용한다.
+    """
+    import sys
+
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        DWMWA_BORDER_COLOR = 34
+        DWMWA_CAPTION_COLOR = 35
+        DWMWA_TEXT_COLOR = 36
+        GA_ROOT = 2
+
+        dwmapi = ctypes.WinDLL("dwmapi")
+        user32 = ctypes.WinDLL("user32")
+
+        # HWND는 64비트 Windows에서 포인터 크기 값이다 — argtypes/restype을
+        # 명시하지 않으면 ctypes가 기본값(c_int)으로 반환값을 32비트로
+        # 잘라내 버릴 수 있다. GetAncestor는 실제 반환 핸들 값이라 이
+        # 잘림이 나면 엉뚱한(또는 0인) 창을 가리키게 된다.
+        user32.GetAncestor.restype = wintypes.HWND
+        user32.GetAncestor.argtypes = [wintypes.HWND, wintypes.UINT]
+        dwmapi.DwmSetWindowAttribute.restype = ctypes.HRESULT
+        dwmapi.DwmSetWindowAttribute.argtypes = [
+            wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD,
+        ]
+
+        child_hwnd = wintypes.HWND(window.winfo_id())
+        root_hwnd = user32.GetAncestor(child_hwnd, GA_ROOT)
+        if not root_hwnd:
+            return
+        hwnd = wintypes.HWND(root_hwnd)
+
+        # 캡션(타이틀바 바탕) = WINDOW_BG로 창 본체와 한 면처럼 이어지게,
+        # 캡션 글자 = TEXT_PRIMARY(본문 텍스트와 같은 색), 테두리 =
+        # BORDER(헤어라인)로 앱 전체 라이트 팔레트와 맞춘다.
+        attrs = (
+            (DWMWA_CAPTION_COLOR, WINDOW_BG),
+            (DWMWA_TEXT_COLOR, TEXT_PRIMARY),
+            (DWMWA_BORDER_COLOR, BORDER),
+        )
+        for attr, hex_color in attrs:
+            value = wintypes.DWORD(_rgb_hex_to_colorref(hex_color))
+            hr = dwmapi.DwmSetWindowAttribute(
+                hwnd, wintypes.DWORD(attr), ctypes.byref(value), ctypes.sizeof(value)
+            )
+            if hr != 0:
+                return
+    except Exception:
+        # dwmapi가 없거나(구형 Windows), 로드에 실패하거나, 호출 자체가
+        # 예외를 내는 어떤 경우든 타이틀바는 그냥 기본값으로 남고 앱은
+        # 정상적으로 계속 뜬다.
+        return
+
+
 # ── 라이트 팔레트 ────────────────────────────────────────────────────────
 #
 # macOS 라이트 모드(Activity Monitor 참고 이미지의 라이트 버전) 값에서

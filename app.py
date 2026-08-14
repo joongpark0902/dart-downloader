@@ -18,6 +18,7 @@ class DartApp(ctk.CTk):
         self.selected_corp = None
 
         self._build_ui()
+        ui_theme.apply_titlebar_theme(self)
 
     def _build_ui(self):
         self.grid_columnconfigure(0, weight=1)
