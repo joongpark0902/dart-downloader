@@ -13,6 +13,7 @@ _update_titles는 각 모듈의 SCOPE 기반 한 곳으로 합쳤다. 연결/별
 """
 import customtkinter as ctk
 
+import ui_theme
 from analysis import TAB_SPECS, fin, ratio
 
 
@@ -21,14 +22,25 @@ class AnalysisPanel:
 
     def __init__(self, parent, app):
         self.app = app
-        self.frame = ctk.CTkFrame(parent)
+        self.frame = ctk.CTkFrame(
+            parent, fg_color=ui_theme.PANEL_BG, border_width=1, border_color=ui_theme.BORDER
+        )
         self.frame.grid_columnconfigure(0, weight=1)
         self.frame.grid_rowconfigure(0, weight=0)
         self.frame.grid_rowconfigure(1, weight=1)
 
         self._build_header(self.frame)
 
-        self.tabview = ctk.CTkTabview(self.frame, command=self._on_tab_change)
+        # CTkTabview에 fg_color를 명시한다 — 안 주면 "이 프레임 색이 CTkFrame
+        # 기본값과 같은가"를 보고 탭 안쪽 톤을 자동으로 고르는데, 위에서
+        # self.frame의 fg_color를 이미 PANEL_BG로 직접 지정했으므로 그 자동
+        # 판단이 깨진다. 명시적으로 SURFACE(흰색)를 줘서 각 탭 내용 영역이
+        # macOS 표 배경처럼 흰 바탕이 되게 하고, ui_theme.
+        # TABLE_CELL_BG_TRANSPARENT_SCROLL(analysis/audit.py 등이 표 셀
+        # 배경으로 쓰는 값)도 이 SURFACE와 맞춰 둔다.
+        self.tabview = ctk.CTkTabview(
+            self.frame, fg_color=ui_theme.SURFACE, command=self._on_tab_change
+        )
         self.tabview.grid(row=1, column=0, sticky="nsew", padx=8, pady=(4, 8))
 
         self._ctx = {}

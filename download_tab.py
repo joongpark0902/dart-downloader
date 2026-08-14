@@ -61,7 +61,7 @@ class DownloadPanel:
 
     def __init__(self, parent, app):
         self.app = app
-        self.frame = ctk.CTkFrame(parent)
+        self.frame = ctk.CTkFrame(parent, fg_color=ui_theme.PANEL_BG)
         self.frame.grid_columnconfigure(0, weight=1)
         self.frame.grid_rowconfigure(2, weight=1)
 
@@ -85,7 +85,7 @@ class DownloadPanel:
     # ── 좌측 패널 조립 ────────────────────────────────────────────────────────
 
     def _build_top(self, parent):
-        f = ctk.CTkFrame(parent)
+        f = ctk.CTkFrame(parent, fg_color=ui_theme.SURFACE, border_width=1, border_color=ui_theme.BORDER)
         f.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
         f.grid_columnconfigure(1, weight=1)
         f.grid_columnconfigure(4, weight=2)
@@ -108,7 +108,7 @@ class DownloadPanel:
         )
 
     def _build_mid(self, parent):
-        f = ctk.CTkFrame(parent)
+        f = ctk.CTkFrame(parent, fg_color="transparent")
         f.grid(row=1, column=0, sticky="ew", padx=8, pady=4)
         f.grid_columnconfigure(0, weight=1)
 
@@ -116,7 +116,7 @@ class DownloadPanel:
         self._build_options(f)
 
     def _build_search(self, parent):
-        f = ctk.CTkFrame(parent)
+        f = ctk.CTkFrame(parent, fg_color=ui_theme.SURFACE, border_width=1, border_color=ui_theme.BORDER)
         f.grid(row=0, column=0, sticky="nsew", padx=(8, 4), pady=8)
         f.grid_columnconfigure(0, weight=1)
 
@@ -146,11 +146,11 @@ class DownloadPanel:
         sb.pack(side="right", fill="y")
         self.listbox.bind("<<ListboxSelect>>", self._on_select)
 
-        self.selected_label = ctk.CTkLabel(f, text="선택된 회사: 없음", text_color="gray")
+        self.selected_label = ctk.CTkLabel(f, text="선택된 회사: 없음", text_color=ui_theme.TEXT_SECONDARY)
         self.selected_label.grid(row=3, column=0, columnspan=2, padx=10, pady=(6, 10), sticky="w")
 
     def _build_options(self, parent):
-        f = ctk.CTkFrame(parent)
+        f = ctk.CTkFrame(parent, fg_color=ui_theme.SURFACE, border_width=1, border_color=ui_theme.BORDER)
         f.grid(row=0, column=1, sticky="ns", padx=(4, 8), pady=8)
 
         ctk.CTkLabel(f, text="조회 옵션", font=ctk.CTkFont(size=13, weight="bold")).grid(
@@ -190,7 +190,7 @@ class DownloadPanel:
 
         ctk.CTkLabel(
             f, text="※ 감사보고서 = 단독공시(별도·연결)\n     비상장 외감법인은 이것만 있습니다",
-            text_color="gray60", justify="left", anchor="w",
+            text_color=ui_theme.TEXT_SECONDARY, justify="left", anchor="w",
             font=ctk.CTkFont(size=11),
         ).grid(row=8, column=0, columnspan=2, padx=(12, 12), pady=(0, 2), sticky="w")
 
@@ -210,7 +210,7 @@ class DownloadPanel:
         self.download_btn.grid(row=10, column=0, columnspan=2, padx=12, pady=(6, 12), sticky="ew")
 
     def _build_log(self, parent):
-        f = ctk.CTkFrame(parent)
+        f = ctk.CTkFrame(parent, fg_color=ui_theme.SURFACE, border_width=1, border_color=ui_theme.BORDER)
         f.grid(row=2, column=0, sticky="nsew", padx=8, pady=(4, 8))
         f.grid_columnconfigure(0, weight=1)
         f.grid_rowconfigure(1, weight=1)
@@ -218,7 +218,10 @@ class DownloadPanel:
         ctk.CTkLabel(f, text="로그", font=ctk.CTkFont(size=13, weight="bold")).grid(
             row=0, column=0, padx=10, pady=(8, 0), sticky="w"
         )
-        self.log_box = ctk.CTkTextbox(f, state="disabled", font=("Consolas", 10), wrap="word")
+        self.log_box = ctk.CTkTextbox(
+            f, state="disabled", font=(ui_theme.FONT_FAMILY_MONO, 10), wrap="word",
+            fg_color=ui_theme.SURFACE, border_width=1, border_color=ui_theme.BORDER,
+        )
         self.log_box.grid(row=1, column=0, sticky="nsew", padx=10, pady=(4, 10))
 
     # ── 이벤트 핸들러 ──────────────────────────────────────────────────────────
@@ -277,7 +280,7 @@ class DownloadPanel:
         name = corp["corp_name"]
         code = corp["corp_code"]
         self.selected_label.configure(
-            text=f"선택된 회사: {name}  ({code})", text_color="white"
+            text=f"선택된 회사: {name}  ({code})", text_color=ui_theme.TEXT_PRIMARY
         )
 
         if not corp.get("stock_code"):

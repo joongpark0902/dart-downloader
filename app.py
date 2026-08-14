@@ -10,6 +10,7 @@ class DartApp(ctk.CTk):
     def __init__(self):
         ui_theme.apply_theme()
         super().__init__()
+        self.configure(fg_color=ui_theme.WINDOW_BG)
         self.title("DART 공시 다운로더")
         self.geometry("1300x720")
         self.minsize(1000, 580)
