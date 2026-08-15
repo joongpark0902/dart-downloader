@@ -105,7 +105,7 @@ DART 조회에서 흔히 막히는 지점입니다. 정기공시(`pblntf_ty=A`)�
 - **캐싱** — 전체 회사목록(`CORPCODE.xml`, 30MB)은 최초 1회만 받아 재사용
 - **중단 지점 복구** — 접수번호별 `.done_` 마커를 남겨 재실행 시 건너뜀
 - **UI 블로킹 방지** — 네트워크 작업은 별도 스레드에서 돌리고 로그를 실시간 전달
-- **엔진/UI 분리** — `dart_engine.py`는 GUI를 전혀 모릅니다. `log_fn` 콜백만 주입받아 CLI에서도 그대로 재사용 가능
+- **엔진/UI 분리** — 엔진 계층(`dart_client`·`downloader`·`financials`·`dart_viewer`·`xml_fix`·`note_links`)은 GUI를 전혀 모릅니다. `log_fn` 콜백만 주입받아 CLI에서도 그대로 재사용 가능
 
 ---
 
@@ -117,7 +117,7 @@ DART 조회에서 흔히 막히는 지점입니다. 정기공시(`pblntf_ty=A`)�
 git clone https://github.com/joongpark0902/dart-downloader.git
 cd dart-downloader
 pip install -r requirements.txt
-python dart_gui.py
+python app.py
 ```
 
 인증키는 실행 후 GUI 상단 입력창에 붙여넣고 **[저장]**을 누르면 실행파일 옆 `config.txt`에 보관되어 다음 실행부터 자동으로 채워집니다. 이 파일은 `.gitignore`에 들어 있습니다.
@@ -143,6 +143,22 @@ python scripts/test_engine.py
 | `step6_audit_report.py` | 감사보고서 단독공시(`pblntf_ty=F`) 경로 검증 |
 | `test_engine.py` | 엔진 전체 흐름 통합 검증 |
 
+### 테스트
+
+`tests/`에는 네트워크도 인증키도 없이 도는 오프라인 테스트 55개가 있습니다. 실제 DART 원문에서 뽑아낸 XML 픽스처와 골든 HTML을 기준으로, 변환 결과가 한 글자라도 달라지면 잡아냅니다.
+
+```bash
+python -m unittest discover -s tests -t .
+```
+
+| 파일 | 검증 내용 |
+|---|---|
+| `test_convert_regression.py` | XML → 읽기용 HTML 변환 골든 파일 회귀 |
+| `test_note_links.py` | 주석 참조 → 주석 본문 링크 (오링크·중복 id 방지) |
+| `test_downloader.py` | 접수번호별 완료 마커·파일명 정리 |
+| `test_viewer_css.py` | 뷰어 스타일·목차 앵커 |
+| `test_public_api.py` | 모듈 분리 후 이전 이름(`dart_engine`) 호환 |
+
 ---
 
 ## 파일 구조
@@ -162,6 +178,7 @@ python scripts/test_engine.py
 | `note_links.py` | 주석 참조를 주석 본문으로 잇는 링크 생성 |
 | `xml_fix.py` | DART 비표준 XML 보정 |
 | `dart_engine.py`, `dart_gui.py` | 이전 이름 호환용 shim |
+| `tests/` | 오프라인 테스트 55개 (픽스처 · 골든 HTML) |
 
 `scripts/` 아래 단계별 도구는 `dart_engine` shim을 통해 그대로 동작합니다.
 
